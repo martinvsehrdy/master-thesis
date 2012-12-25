@@ -2,24 +2,25 @@
 //
 
 #include "stdafx.h"
-#include "matice.h"
 #include <string>
 #include <iostream>
 #include <iomanip>
+#include "matice.h"
+#include <list>
 
 using namespace std;
 
-int _tmain(int argc, _TCHAR* argv[])
+int main(int argc, char* argv[])
 {
-	matice mat(4);
+
+	matice<double> mat(4);
 	mat.load_matrix("mat1.txt");
-	//mat.save_matrix("mat1.txt");
 	mat.vypsat();
 	mat.do_gauss();
 	cout << "VYSLEDEK:" << endl;
 	mat.vypsat();
-
-	getchar();getchar();
+	
+	cin.get();
 	return 0;
 }
 
