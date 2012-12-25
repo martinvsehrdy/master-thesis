@@ -205,8 +205,24 @@ public:
 	}
 	void do_modular(void)
 	{
-		if(pointer==NULL || prava_strana==NULL) return;
 		// frexp, ldexp
+		if(pointer==NULL || prava_strana==NULL) return;
+		// TODO: vygenerovat pole prvocisel
+
+		double D_hadamard=1.0;
+		for(int iX=0;iX<N;iX++)
+		{
+			double souc=0.0;
+			for(int iY=0;iY<N;iY++)
+			{
+				souc+=get_cell(iX, iY)*get_cell(iX, iY);
+			}
+			// kontrola jestli by slo ze 'souc' vytknout nejake x^2, ktere vyleze pred odmocninu, a ktere deli 'D_hadamard' => nesmi byt m_i
+			D_hadamard*=souc;
+		}
+		D_hadamard=sqrt(D_hadamard);
+
+
 		int min_exponent;		// exponent nejmensiho cisla
 		T max_a=get_cell1(0);
 		T max_y=prava_strana[0];
@@ -231,24 +247,15 @@ public:
 				}
 			}
 		}
-		T M1=pow(N, N/2)*pow(max_a, N);
-		T M2=N*pow(N-1, (N-1)/2)*pow(max_a, N-1)*max_y;
+		T M1=pow((T)N, N/2.0)*pow(max_a, N);
+		T M2=N*pow((T)(N-1), (N-1)/2)*pow(max_a, N-1)*max_y;
 
-		long M=(long)(2*max(M1, M2));
+		T M=2.0*max(M1, M2);
 		// TODO: funkce gcd(M,D), zvolit m_1, m_2... m_r
+		//       nasobit prvocisla, ktera nedeli D_hadamard, do te doby nez budou vetsi nez M
 
 
-		double D_hadamard=1.0;
-		for(int iX=0;iX<N;iX++)
-		{
-			double souc=0.0;
-			for(int iY=0;iY<N;iY++)
-			{
-				souc+=get_cell(iX, iY)*get_cell(iX, iY);
-			}
-			D_hadamard*=souc;
-		}
-		D_hadamard=sqrt(D_hadamard);
+		
 
 
 	}

@@ -16,7 +16,7 @@ int main(int argc, char* argv[])
 	matice<double> mat(4);
 	mat.load_matrix("mat1.txt");
 	mat.vypsat();
-	mat.do_gauss();
+	mat.do_modular();
 	cout << "VYSLEDEK:" << endl;
 	mat.vypsat();
 	
