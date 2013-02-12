@@ -398,7 +398,7 @@ public:
 				m_prava_strana[m_i][i]=9;
 				m_diagonala[m_i][i]=8;
 			}
-			cout << endl;
+			//cout << endl;
 			// zkopirovat a modulovat
 			for(int y=0;y<N;y++)
 			{
@@ -504,7 +504,8 @@ public:
 			}
 			cout << endl;
 		}
-		// TODO: z vysledku m_prava_strana ziskat celociselne vysledky - mixed-radix
+		// z vysledku m_prava_strana ziskat celociselne vysledky - mixed-radix
+		// TODO: chybne
 		for(int y=0;y<N;y++)
 		{
 			mpz_class citatel=0;
@@ -513,7 +514,7 @@ public:
 			m_i=0;
 			for(list<int>::iterator m_iter=m_prvocisla.begin();m_iter!=m_prvocisla.end();m_iter++)
 			{
-				cout << "+" << m_prava_strana[m_i][y] <<"*" << radix;
+				//cout << "+" << m_prava_strana[m_i][y] <<"*" << radix;
 				//m_prava_strana[m_i][y]
 				citatel+=m_prava_strana[m_i][y]*radix;
 				jmenovatel+=m_diagonala[m_i][y]*radix;
@@ -521,9 +522,21 @@ public:
 
 				m_i++;
 			}
-			cout << endl;
+			//cout << endl;
 			prava_strana[y]=citatel.get_d()/jmenovatel.get_d();
-			cout << citatel << "/" << endl << jmenovatel << " = " << prava_strana[y] << endl;
+			//cout << citatel << "/" << endl << jmenovatel << " = " << prava_strana[y] << endl;
+			m_i=0;
+			for(list<int>::iterator m_iter=m_prvocisla.begin();m_iter!=m_prvocisla.end();m_iter++)
+			{
+				mpz_class a=(*m_iter);
+				mpz_class m=citatel % a;
+				double m_citatel=m.get_d();
+				m=jmenovatel % a;
+				double m_jmenovatel=m.get_d();
+				m_prava_strana[m_i][y]==m_citatel;
+				m_diagonala[m_i][y]==m_jmenovatel;
+				m_i++;
+			}
 		}
 
 		//delete[] sieve;

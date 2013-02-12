@@ -27,12 +27,14 @@ int main(int argc, char** argv)
 	/*/
 
 	int size=0;
+	int metoda=0;
 	try
 	{
-		if(argc>1)
+		if(argc>2)
 		{
-			size=atoi(argv[1]);
-		}
+			metoda=atoi(argv[1]);
+			size=atoi(argv[2]);
+		}else throw;
 	}catch(...)
 	{
 		printf("nekde se stala chyba :-(\nspravne volani programu: %s ", argv[0]);
@@ -43,11 +45,16 @@ int main(int argc, char** argv)
 	matice<double> mat(size);
 	
 	mat.fill_hilbert();
-	mat.load_matrix("mat1.txt");
+	//mat.load_matrix("mat1.txt");
 	
 	mat.vypsat();
-	mat.do_modular();
-	//mat.do_gauss();
+	switch(metoda)
+	{
+	case 1: mat.do_gauss();
+		break;
+	case 2: mat.do_modular();
+		break;
+	}
 	cout << "VYSLEDEK:" << endl;
 	mat.vypsat();
 	
