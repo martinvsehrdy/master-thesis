@@ -5,11 +5,53 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <iostream>
+#include <cuda.h>
+//#include "kernels.cu"
 #include <cuda_runtime.h>
 
 using namespace std;
 
+void print_gpus_info(void);
+__global__ void kernel1(double* pole, int N)
+{
+	int id=threadIdx.x;
+	while( id<N )
+	{
+		pole[id]=1.0;
+		id+=1024;
+	}
+}
+
 int main(char** argv, int argc)
+{
+	int N=100;
+	int sum=0;
+	double* A=new double[N];
+	for(int i=0;i<N;i++)
+	{
+		A[i]=i;
+		sum+=i;
+	}
+	for(int i=0;i<N;i++) cout << A[i] << "\t";
+	double* cudaA;
+	cudaMalloc((void**)&cudaA, N*sizeof(double));
+	cudaMemcpy(cudaA, A, N*sizeof(double), cudaMemcpyHostToDevice);
+	kernel1<<<1,1024>>>(cudaA, N);
+	cout << endl;
+	cudaMemcpy(A, cudaA, N*sizeof(double), cudaMemcpyDeviceToHost);
+	cudaFree(cudaA);
+	for(int i=0;i<N;i++) cout << A[i] << "\t";
+
+	delete[] A;
+
+
+#ifdef _DEBUG
+	cin.get();
+#endif
+}
+
+
+void print_gpus_info(void)
 {
 	cudaDeviceProp prop;
     int count;
@@ -59,9 +101,6 @@ int main(char** argv, int argc)
 		prop.maxGridSize[2] );
 		printf( "\n" );
 	}
-#ifdef _DEBUG
-	cin.get();
-#endif
 }
 
 #endif /* _CUDA_CU_ */
