@@ -67,43 +67,9 @@ public:
 	{
 		return N;
 	}
-	int get_index(int X, int Y)
+	int get_index(int X, int Y)	// SLOUPEC, RADEK
 	{
 		return X*N+Y;
-	}
-	int set_cell(int X, int Y, T value)
-	{
-		if(pointer != NULL && 0<=X && X<N && 0<=Y && Y<N)
-		{
-			pointer[X*N+Y]=value;
-			return 0;
-		}
-		return 1;
-	}
-	T get_cell(int X, int Y)	// SLOUPEC, RADEK
-	{
-		if(pointer != NULL && 0<=X && X<N && 0<=Y && Y<N)
-		{
-			return pointer[X*N+Y];
-		}
-		return 0;
-	}
-	int set_cell1(int ind, T value)
-	{
-		if(prava_strana != NULL && 0<=ind && ind<N)
-		{
-			prava_strana[ind]=value;
-			return 0;
-		}
-		return 1;
-	}
-	T get_cell1(int ind)
-	{
-		if(prava_strana != NULL && 0<=ind && ind<N)
-		{
-			return prava_strana[ind];
-		}
-		return 1;
 	}
 	void fill_random(void)
 	{
@@ -124,7 +90,7 @@ public:
 			for(int x=0;x<N;x++)
 			{
 				T val=1.0/((T)(1+x+y));
-				set_cell(x, y, val);
+				pointer[get_index(x, y)] = val;
 			}
 			prava_strana[y]=(y+1)*(y+1);
 		}
@@ -138,7 +104,7 @@ public:
 		{
 			for(int x=0;x<N;x++)
 			{
-				file << get_cell(x, y) << "\t";
+				file << pointer[get_index(x, y)] << "\t";
 			}
 			file << prava_strana[y] << endl;
 		}
@@ -183,23 +149,23 @@ public:
 	{
 		for(int ipivot=0;ipivot<N;ipivot++)
 		{
-			if(get_cell(ipivot, ipivot)==0)
+			if(pointer[get_index(ipivot, ipivot)]==0)
 			{
 				// v 'ipivot'-tem radku na diagonále je nula => vymena s jinym radkem
 				int novy_pivot=ipivot;
 				do{
 					novy_pivot++;
-				}while(get_cell(ipivot, novy_pivot)==0 && novy_pivot<N);
+				}while(pointer[get_index(ipivot, novy_pivot)]==0 && novy_pivot<N);
 
-				if(get_cell(ipivot, novy_pivot)==0)		// nasel jsem radek s nenulovym prvkem ve sloupci ipivot
+				if(pointer[get_index(ipivot, novy_pivot)]==0)		// nasel jsem radek s nenulovym prvkem ve sloupci ipivot
 				{
 					// vymena radku ipivot a novy_pivot
 					double pom;
 					for(int iX=0;iX<N;iX++)
 					{
-						pom=get_cell(iX, ipivot);
-						set_cell(iX, ipivot, get_cell(iX, novy_pivot));
-						set_cell(iX, novy_pivot, pom);
+						pom=pointer[get_index(iX, ipivot)];
+						pointer[get_index(iX, ipivot) = pointer[get_index(iX, novy_pivot)];
+						pointer[get_index(iX, novy_pivot)] = pom;
 					}
 					pom=prava_strana[ipivot];
 					prava_strana[ipivot]=prava_strana[novy_pivot];
@@ -212,25 +178,49 @@ public:
 			for(int iY=0;iY<N;iY++)	// prochazi jednotlive radky
 			{
 				if(iY==ipivot) continue;
-				double multipl=get_cell(ipivot, iY)/get_cell(ipivot, ipivot);
+				double multipl=pointer[get_index(ipivot, iY)]/pointer[get_index(ipivot, ipivot)];
 				for(int iX=0;iX<N;iX++)	// prochazi cisla v i1-tem radku
 				{
-					set_cell(iX, iY, get_cell(iX, iY)-multipl*get_cell(iX, ipivot));
+					pointer[get_index(iX, iY)]-=multipl*pointer[get_index(iX, ipivot)]);
 				}
-				prava_strana[iY]=prava_strana[iY]-multipl*prava_strana[ipivot];
+				prava_strana[iY]-=multipl*prava_strana[ipivot];
 			}
 		}
 		// znormovani na jednicku
 		for(int ipivot=0;ipivot<N;ipivot++)
 		{
-			prava_strana[ipivot]/=get_cell(ipivot, ipivot);
-			set_cell(ipivot, ipivot, 1.0);
+			prava_strana[ipivot]/=pointer[get_index(ipivot, ipivot)];
+			pointer[ipivot, ipivot)]=1.0;
 		}
 	}
 	/*
 	 * vynasobi radky tak, aby kazde cislo melo za desetinou carkou pouze nuly
 	 */
-	void vstupni_slr();	// int N, T* matice, T* prava_strana
+	void vstupni_slr()	// int N, T* matice, T* prava_strana
+	{
+		// prenasobeni radku matice, aby za desetinou carkou byly jen nuly
+		for(int y=0;y<N;y++)
+		{
+			int min_exponent;
+			ifrexp(prava_strana[y], &min_exponent);
+			int exponent;
+			for(int x=0;x<N;x++)
+			{
+				ifrexp(pointer[get_index(x,y)], &exponent);
+				if(min_exponent>exponent)
+				{
+					min_exponent=exponent;
+				}
+			}
+			T pom=frexp(prava_strana[y], &exponent);
+			prava_strana[y]=ldexp(pom, exponent - min_exponent);
+			for(int x=0;x<N;x++)
+			{
+				pom=frexp(pointer[get_index(x,y)], &exponent);
+				pointer[get_index(x,y)] = ldexp(pom, exponent - min_exponent));
+			}
+		}
+	}
 	/*
 	 * spocita hadamarduv odhad a modul M
 	 */
@@ -259,39 +249,18 @@ public:
 	void do_modular(void)
 	{
 		if(pointer==NULL || prava_strana==NULL) return;
-		// prenasobeni radku matice, aby za desetinou carkou byly jen nuly
-		for(int y=0;y<N;y++)
-		{
-			int min_exponent;
-			ifrexp(prava_strana[y], &min_exponent);
-			int exponent;
-			for(int x=0;x<N;x++)
-			{
-				ifrexp(get_cell(x,y), &exponent);
-				if(min_exponent>exponent)
-				{
-					min_exponent=exponent;
-				}
-			}
-			T pom=frexp(prava_strana[y], &exponent);
-			prava_strana[y]=ldexp(pom, exponent - min_exponent);
-			for(int x=0;x<N;x++)
-			{
-				pom=frexp(get_cell(x,y), &exponent);
-				set_cell(x,y, ldexp(pom, exponent - min_exponent));
-			}
-		}
+		
 
 		// spocitat 'M'
-		T max_a=get_cell(0,0);
+		T max_a=pointer[get_index(0,0)];
 		T max_y=prava_strana[0];
 		for(int y=0;y<N;y++)
 		{
 			for(int x=0;x<N;x++)
 			{
-				if(max_a<get_cell(x,y))
+				if(max_a<pointer[get_index(x,y)])
 				{
-					max_a=get_cell(x,y);
+					max_a=pointer[get_index(x,y)];
 				}
 			}
 			if(max_y<prava_strana[y])
@@ -333,7 +302,7 @@ public:
 			mpz_class souc=0;
 			for(int iY=0;iY<N;iY++)
 			{
-				souc+=(get_cell(iX, iY))*(get_cell(iX, iY));
+				souc+=(pointer[get_index(iX, iY)])*(pointer[get_index(iX, iY)]);
 			}
 			double dh=D_hadamard1.get_d();
 			double ds=souc.get_d();
@@ -434,7 +403,7 @@ public:
 				int pom;
 				for(int x=0;x<N;x++)
 				{
-					pom=((long)get_cell(x,y)) % (*m_iter);
+					pom=((long)pointer[get_index(x,y)]) % (*m_iter);
 					//if( pom==0 ) pom=(*m_iter);
 					m_matice[get_index(x,y)]=pom;
 				}
@@ -586,7 +555,7 @@ public:
 			int x;
 			for(x=0;x<min(N,5);x++)
 			{
-				printf("%7.2f ", get_cell(x, y));
+				printf("%7.2f ", pointer[get_index(x, y)]);
 			}
 			if(x<N-1) printf("...");
 			printf("| %7.2f\n", prava_strana[y]);
