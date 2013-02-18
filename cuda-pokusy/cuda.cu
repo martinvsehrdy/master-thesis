@@ -26,7 +26,16 @@ int main(char** argv, int argc)
 {
 	int N=100;
 	int sum=0;
-	double* A=new double[N];
+	
+	double* A=new double[N*N];
+	double* b=new double[N];
+
+	double* cuda_A;
+	cudaMalloc((void**)cuda_A, N*N*sizeof(double));
+	double* cuda_b;
+	cudaMalloc((void**)cuda_b, N*sizeof(double));
+
+
 	for(int i=0;i<N;i++)
 	{
 		A[i]=i;

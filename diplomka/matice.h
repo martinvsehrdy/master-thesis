@@ -164,7 +164,7 @@ public:
 					for(int iX=0;iX<N;iX++)
 					{
 						pom=pointer[get_index(iX, ipivot)];
-						pointer[get_index(iX, ipivot) = pointer[get_index(iX, novy_pivot)];
+						pointer[get_index(iX, ipivot)] = pointer[get_index(iX, novy_pivot)];
 						pointer[get_index(iX, novy_pivot)] = pom;
 					}
 					pom=prava_strana[ipivot];
@@ -181,7 +181,7 @@ public:
 				double multipl=pointer[get_index(ipivot, iY)]/pointer[get_index(ipivot, ipivot)];
 				for(int iX=0;iX<N;iX++)	// prochazi cisla v i1-tem radku
 				{
-					pointer[get_index(iX, iY)]-=multipl*pointer[get_index(iX, ipivot)]);
+					pointer[get_index(iX, iY)]-=multipl*pointer[get_index(iX, ipivot)];
 				}
 				prava_strana[iY]-=multipl*prava_strana[ipivot];
 			}
@@ -190,7 +190,7 @@ public:
 		for(int ipivot=0;ipivot<N;ipivot++)
 		{
 			prava_strana[ipivot]/=pointer[get_index(ipivot, ipivot)];
-			pointer[ipivot, ipivot)]=1.0;
+			pointer[get_index(ipivot, ipivot)]=1.0;
 		}
 	}
 	/*
@@ -217,85 +217,16 @@ public:
 			for(int x=0;x<N;x++)
 			{
 				pom=frexp(pointer[get_index(x,y)], &exponent);
-				pointer[get_index(x,y)] = ldexp(pom, exponent - min_exponent));
+				pointer[get_index(x,y)] = ldexp(pom, exponent - min_exponent);
 			}
 		}
 	}
 	/*
 	 * spocita hadamarduv odhad a modul M
 	 */
-	void exec_hadamard(mpz_class* hadamard, mpz_class* modul_M);	// int N,  T* matice, T* prava_strana
-	/*
-	 * rozlozi modul M na soucin jednotlivych modulu vzajemne nesoudelnych
-	 * r - pocet jednotlivych modulu
-	 * moduly - pole jednotlivych modulu
-	 * M - vstupni modul M
-	 */
-	void exec_moduly(int* r, int* moduly, mpz_class modul_M);	// int N,  T* matice, T* prava_strana
-	/*
-	 * vytvori SLR v modulu "modul", zmoduluje vstupní SLR
-	 * modul - vybrany jednotlivy modul
-	 * m_matice - tady bude matice modularnich zbytku
-	 * m_prava_strana - prava strana   - || -
-	 */
-	void rozklad_slr_mod(int modul, int* m_matice, int* m_prava_strana);
-
-	void gauss_jordan_elim(int modul, int* m_matice, int* m_prava_strana, int* m_vys_citatel, int* m_vys_jmenovatel);
-	/*
-	 * r - pocet jednotlivych modulu
-	 * 
-	 */
-	void zpetny_prevod(int r, int** vys_citatel, int** vys_jmenovatel, T* vysledek);
-	void do_modular(void)
+	void exec_hadamard(mpz_class* hadamard, T* modul_M)	// int N,  T* matice, T* prava_strana
 	{
-		if(pointer==NULL || prava_strana==NULL) return;
-		
-
-		// spocitat 'M'
-		T max_a=pointer[get_index(0,0)];
-		T max_y=prava_strana[0];
-		for(int y=0;y<N;y++)
-		{
-			for(int x=0;x<N;x++)
-			{
-				if(max_a<pointer[get_index(x,y)])
-				{
-					max_a=pointer[get_index(x,y)];
-				}
-			}
-			if(max_y<prava_strana[y])
-			{
-				max_y=prava_strana[y];
-			}
-		}
-		T M1=pow((T)N, N/2)*pow(max_a, N);
-		T M2=N*pow((T)(N-1), (N-1)/2)*pow(max_a, N-1)*max_y;
-		T M=2*max(M1, M2);
-
-		int poc_sieve;
-		frexp(M, &poc_sieve);
-		poc_sieve=poc_sieve*poc_sieve;
-		// vygenerovat pole prvocisel
-		int* sieve = new int[poc_sieve];
-		for(int i = 0; i <= poc_sieve; i ++)
-		{
-			sieve[i] = true;
-		}
-		//true == je prvocislo
-		//false == je slozene
-		sieve[0] = sieve[1] = false; //nula a jedna nejsou prvocisla
-		for(int i = 2; i <= sqrt((double)poc_sieve); i++)
-		{
-			//if( i%2==0 ) sieve[i]=false;	// suda cisla nejsou prvocisla a 2 je nevyhovujici
-			if(sieve[i] == false) continue;
-			for(int j = 2*i; j <= poc_sieve; j+=i)
-			{ //samotne citani
-				sieve[j] = false;	// nemuze byt z definice prvocislem (je nasobkem jineho cisla)
-			}
-		}
-		
 		// hadamard
-		cout << "\nhadamard ";
 		mpz_class D_hadamard1=1;
 		for(int iX=0;iX<N;iX++)
 		{
@@ -317,17 +248,58 @@ public:
 			D_hadamard1*=souc;
 		}
 		double dh=D_hadamard1.get_d();
-		mpz_class D_hadamard=sqrt(D_hadamard1);
-		
+		*hadamard=sqrt(D_hadamard1);
 
-		cout << "\nprvocisla: ";
+		// spocitat 'M'
+		T max_a=pointer[get_index(0,0)];
+		T max_y=prava_strana[0];
+		for(int y=0;y<N;y++)
+		{
+			for(int x=0;x<N;x++)
+			{
+				if(max_a<pointer[get_index(x,y)])
+				{
+					max_a=pointer[get_index(x,y)];
+				}
+			}
+			if(max_y<prava_strana[y])
+			{
+				max_y=prava_strana[y];
+			}
+		}
+		T M1=pow((T)N, N/2)*pow(max_a, N);
+		T M2=N*pow((T)(N-1), (N-1)/2)*pow(max_a, N-1)*max_y;
+		*modul_M=2*max(M1, M2);
+	}
+	/*
+	 * rozlozi modul M na soucin jednotlivych modulu vzajemne nesoudelnych
+	 * r - pocet jednotlivych modulu
+	 * moduly - pole jednotlivych modulu
+	 * M - vstupni modul M
+	 */
+	void exec_moduly(int* r, int** moduly, mpz_class hadamard, T modul_M)	// int N,  T* matice, T* prava_strana
+	{
+		int poc_sieve;
+		frexp(modul_M, &poc_sieve);
+		poc_sieve=poc_sieve*poc_sieve;
+		// vygenerovat pole prvocisel
+		int* sieve = new int[poc_sieve];
 		for(int i = 0; i <= poc_sieve; i ++)
 		{
-			//if(sieve[i]) cout << i << ", ";
+			sieve[i] = true;
 		}
-		cout << "\nD = " << D_hadamard << "\n";
-
-		
+		//true == je prvocislo
+		//false == je slozene
+		sieve[0] = sieve[1] = false; //nula a jedna nejsou prvocisla
+		for(int i = 2; i <= sqrt((double)poc_sieve); i++)
+		{
+			//if( i%2==0 ) sieve[i]=false;	// suda cisla nejsou prvocisla a 2 je nevyhovujici
+			if(sieve[i] == false) continue;
+			for(int j = 2*i; j <= poc_sieve; j+=i)
+			{ //samotne citani
+				sieve[j] = false;	// nemuze byt z definice prvocislem (je nasobkem jineho cisla)
+			}
+		}
 
 		// zvolit m_1, m_2... m_r
 		// nasobit prvocisla, ktera nedeli D_hadamard, do te doby nez budou vetsi nez M
@@ -341,22 +313,22 @@ public:
 				// TODO: zjistit proc se 3 vyskytuje mezi m_prvocisla kdyz 3^2 deli D_hadamard1
 				mpz_class delitel;
 				mpz_class prvoc=i;
-				mpz_gcd(delitel.get_mpz_t(), prvoc.get_mpz_t(), D_hadamard.get_mpz_t());
+				mpz_gcd(delitel.get_mpz_t(), prvoc.get_mpz_t(), hadamard.get_mpz_t());
 				int idelitel=(int)delitel.get_d();
 				
-				if(delitel==1)
+				if(delitel==1)	// podminka: gcd(hadamard, M) == 1
 				{
 					M_akt*=i;
 					m_prvocisla.push_front(i);
 				}
 			
-				if( M_akt > M )
+				if( M_akt > modul_M )
 				{
 					break;
 				}
 			}
 		}
-		cout << "M     = " << ((mpz_class)M) << " = ";
+		cout << endl << "M_akt = " << M_akt << endl;
 		// TODO: vymazat zbytecna prvocisla napr. 2, 3..
 		/*do
 		{
@@ -372,13 +344,142 @@ public:
 			}else cout << " * ";
 		}while(
 			*/
-		cout << endl << "M_akt = " << M_akt << endl;
+		*r = m_prvocisla.size();
+		int* pole = new int[*r];
+		int i=0;
+		for(list<int>::iterator iter=m_prvocisla.begin();iter!=m_prvocisla.end();iter++)
+		{
+			pole[i] = (*iter);
+			i++;
+		}
+
+#ifndef _DEBUG
+		delete[] sieve;
+#endif
+		*moduly=pole;
+	}
+	/*
+	 * vytvori SLR v modulu "modul", zmoduluje vstupní SLR
+	 * modul - vybrany jednotlivy modul
+	 * m_matice - tady bude matice modularnich zbytku
+	 * m_prava_strana - prava strana   - || -
+	 */
+	void rozklad_slr_mod(int modul, int* m_matice, int* m_prava_strana)
+	{
+		for(int x=0;x<N;x++)	// paralelizovat tenhle nebo
+		{
+			int pom;
+			for(int y=0;y<N;y++)	// tenhle cyklus
+			{
+				pom = ((long)pointer[get_index(x,y)]) % modul;
+				m_matice[get_index(x,y)] = pom;
+			}
+			pom = ((long)prava_strana[x]) % modul;
+			m_prava_strana[x] = pom;
+		}
+	}
+
+	void gauss_jordan_elim(int modul, int* m_matice, int* m_prava_strana, int* m_vys_jmenovatel)
+	{
+		// TODO: posouvat cisla v radcich doleva, kvuli CUDA, aby se pristupovalo stale na ty stejna mista v pameti, 
+		//       vysledek bude v prvnim sloupci matice
+		for(int ipivot=0;ipivot<N;ipivot++)
+		{
+			// deleni nulou => nasobeni inverznim prvkem
+			if(m_matice[get_index(ipivot, ipivot)]==0)
+			{
+				// v 'ipivot'-tem radku na diagonále je nula => vymena s jinym radkem
+				int novy_pivot=ipivot;
+				do{
+					novy_pivot++;
+				}while(m_matice[get_index(ipivot, novy_pivot)]==0 && novy_pivot<N);
+
+				if(m_matice[get_index(ipivot, novy_pivot)]!=0 && novy_pivot<N)		// nasel jsem radek s nenulovym prvkem ve sloupci ipivot
+				{
+					// vymena radku ipivot a novy_pivot
+					int pom;
+					for(int iX=0;iX<N;iX++)
+					{
+						pom=m_matice[get_index(iX, ipivot)];
+						m_matice[get_index(iX, ipivot)]=m_matice[get_index(iX, novy_pivot)];
+						m_matice[get_index(iX, novy_pivot)]=pom;
+					}
+					pom=m_prava_strana[ipivot];
+					m_prava_strana[ipivot]=m_prava_strana[novy_pivot];
+					m_prava_strana[novy_pivot]=pom;
+				}else
+				{
+					// matice nema v 'ipivot'-tem sloupci nenulovy prvek => je singularni
+					//cout << "singularni" << endl;
+					for(int i=0;i<N;i++)	// singularni matice => vysledky jsou nulove (nepouzitelne)
+					{
+						m_prava_strana[i]=0;
+						m_vys_jmenovatel[i]=1;
+					}
+					return;
+				}
+			}
+			int inverzni=m_inv(modul, m_matice[get_index(ipivot, ipivot)]);
+
+			for(int iY=0;iY<N;iY++)	// prochazi jednotlive radky
+			{
+				if(iY==ipivot) continue;
+				int pom;
+				int multipl=(m_matice[get_index(ipivot, iY)]*inverzni) % modul;
+				for(int iX=0;iX<N;iX++)	// prochazi cisla v i1-tem radku
+				{
+					int m1=m_matice[get_index(iX, iY)];
+					int m2=m_matice[get_index(iX, ipivot)];
+					// TODO: jak cuda moduluje hlavne zaporny cisla? potrebuju interval <0;modul)
+					pom = m1-multipl*m2;
+					pom=pom % modul;
+					if(pom<0) pom+=modul;
+					m_matice[get_index(iX, iY)]=pom;
+				}
+				pom = m_prava_strana[iY]-multipl*m_prava_strana[ipivot];
+				// TODO: jak cuda moduluje hlavne zaporny cisla? potrebuju interval <0;modul)
+				m_prava_strana[iY]=pom % modul;
+				if(m_prava_strana[iY]<0) m_prava_strana[iY]+=modul;
+			}
+			// ulozit diagonalu do m_vys_jmenovatel
+			for(int iX=0;iX<N;iX++)
+			{
+				m_vys_jmenovatel[iX]=m_matice[get_index(iX, iX)];
+			}
+				
+		}
+	}
+	/*
+	 * r - pocet jednotlivych modulu
+	 * 
+	 */
+	void zpetny_prevod(int r, int** vys_citatel, int** vys_jmenovatel, T* vysledek)
+	{
+	}
+
+	void do_modular(void)
+	{
+		if(pointer==NULL || prava_strana==NULL) return;
+		
+		vstupni_slr();
+		
+		cout << "\nhadamard = ";
+		mpz_class D_hadamard;
+		T M;
+		exec_hadamard(&D_hadamard, &M);
+		cout << D_hadamard << "; M = " << M << endl;
+
+		int m_r;
+		int* m_moduly;
+		exec_moduly(&m_r, &m_moduly, D_hadamard, M);
+
+		for(int i=0;i<m_r;i++) cout << m_moduly[i] << "\t";
 		// TODO: spustit reseni v jednotlivych modulech
-		int** m_prava_strana=new int*[m_prvocisla.size()];
-		int** m_diagonala=new int*[m_prvocisla.size()];
+		int** m_prava_strana=new int*[m_r];
+		int** m_diagonala=new int*[m_r];
 		int* m_matice=new int[N*N];
 		int m_i=0;
-		for(m_i=0;m_i<m_prvocisla.size();m_i++)
+		for(m_i=0;m_i<m_r;m_i++)
 		{
 			m_prava_strana[m_i]=new int[N];
 			m_diagonala[m_i]=new int[N];
@@ -387,164 +488,45 @@ public:
 				m_prava_strana[m_i][i]=i;
 				m_diagonala[m_i][i]=i;
 			}
-		}
-		m_i=0;
-		for(list<int>::iterator m_iter=m_prvocisla.begin();m_iter!=m_prvocisla.end();m_iter++)
-		{
-			for(int i=0;i<N;i++)
-			{
-				m_prava_strana[m_i][i]=9;
-				m_diagonala[m_i][i]=8;
-			}
-			//cout << endl;
-			// zkopirovat a modulovat
-			for(int y=0;y<N;y++)
-			{
-				int pom;
-				for(int x=0;x<N;x++)
-				{
-					pom=((long)pointer[get_index(x,y)]) % (*m_iter);
-					//if( pom==0 ) pom=(*m_iter);
-					m_matice[get_index(x,y)]=pom;
-				}
-				pom=((long)prava_strana[y]) % (*m_iter);
-				//if( pom==0 ) pom=(*m_iter);
-				m_prava_strana[m_i][y]=pom;
-			}
 
+			// zkopirovat a modulovat
+			rozklad_slr_mod(m_moduly[m_i], m_matice, m_prava_strana[m_i]);
 
 			// spocitat gauss-jordanovu eliminaci
-			// TODO: posouvat cisla v radcich doleva, kvuli CUDA, aby se pristupovalo stale na ty stejna mista v pameti, 
-			//       vysledek bude v prvnim sloupci matice
-			for(int ipivot=0;ipivot<N;ipivot++)
-			{
-				// deleni nulou => nasobeni inverznim prvkem
-				if(m_matice[get_index(ipivot, ipivot)]==0)
-				{
-					// v 'ipivot'-tem radku na diagonále je nula => vymena s jinym radkem
-					int novy_pivot=ipivot;
-					do{
-						novy_pivot++;
-					}while(m_matice[get_index(ipivot, novy_pivot)]==0 && novy_pivot<N);
+			gauss_jordan_elim(m_moduly[m_i], m_matice, m_prava_strana[m_i], m_diagonala[m_i]);
 
-					if(m_matice[get_index(ipivot, novy_pivot)]!=0 && novy_pivot<N)		// nasel jsem radek s nenulovym prvkem ve sloupci ipivot
-					{
-						// vymena radku ipivot a novy_pivot
-						double pom;
-						for(int iX=0;iX<N;iX++)
-						{
-							pom=m_matice[get_index(iX, ipivot)];
-							m_matice[get_index(iX, ipivot)]=m_matice[get_index(iX, novy_pivot)];
-							m_matice[get_index(iX, novy_pivot)]=pom;
-						}
-						pom=m_prava_strana[m_i][ipivot];
-						m_prava_strana[m_i][ipivot]=m_prava_strana[m_i][novy_pivot];
-						m_prava_strana[m_i][novy_pivot]=pom;
-					}else
-					{
-						// matice nema v 'ipivot'-tem sloupci nenulovy prvek => je singularni
-						//cout << "singularni" << endl;
-						for(int i=0;i<N;i++)	// singularni matice => vysledky jsou nulove (nepouzitelne)
-						{
-							m_prava_strana[m_i][i]=0;
-							m_diagonala[m_i][i]=0;
-						}
-						//break;
-					}
-				}
-				int inverzni=m_inv((*m_iter), m_matice[get_index(ipivot, ipivot)]);
 
-				for(int iY=0;iY<N;iY++)	// prochazi jednotlive radky
-				{
-					if(iY==ipivot) continue;
-					int pom;
-					int multipl=(m_matice[get_index(ipivot, iY)]*inverzni) % (*m_iter);
-					for(int iX=0;iX<N;iX++)	// prochazi cisla v i1-tem radku
-					{
-						int m1=m_matice[get_index(iX, iY)];
-						int m2=m_matice[get_index(iX, ipivot)];
-						pom = m1-multipl*m2;
-						pom=pom % (*m_iter);
-						if(pom<0) pom+=(*m_iter);
-						m_matice[get_index(iX, iY)]=pom;
-					}
-					pom = m_prava_strana[m_i][iY]-multipl*m_prava_strana[m_i][ipivot];
-					m_prava_strana[m_i][iY]=pom % (*m_iter);
-					if(m_prava_strana[m_i][iY]<0) m_prava_strana[m_i][iY]+=(*m_iter);
-				}
-				// ulozit diagonalu do m_diagonala
-				for(int iX=0;iX<N;iX++)
-				{
-					m_diagonala[m_i][iX]=m_matice[get_index(iX, iX)];
-				}
-				
-			}
-			//*/
-			
-			m_i++;
 		}
 		
-		delete[] m_matice;
 		// vypsat vysledky m_prava_strana
 		cout << "VYSLEDKY: " << endl;
-		for(list<int>::iterator m_iter=m_prvocisla.begin();m_iter!=m_prvocisla.end();m_iter++)
+		delete[] m_matice;
+
+		for(int i=0;i<m_r;i++)
 		{
-			cout << (*m_iter) << "\t";
+			cout << m_moduly[i] << "\t";
 		}
 		cout << endl;
 		for(int y=0;y<N;y++)
 		{
 			m_i=0;
-			for(list<int>::iterator m_iter=m_prvocisla.begin();m_iter!=m_prvocisla.end();m_iter++)
+			for(int i=0;i<m_r;i++)
 			{
-				cout << m_prava_strana[m_i][y] << "/" << m_diagonala[m_i][y] << "\t";
-				m_i++;
+				cout << m_prava_strana[i][y] << "/" << m_diagonala[i][y] << "\t";
 			}
 			cout << endl;
 		}
 		// z vysledku m_prava_strana ziskat celociselne vysledky - mixed-radix
-		// TODO: chybne
-		for(int y=0;y<N;y++)
-		{
-			mpz_class citatel=0;
-			mpz_class jmenovatel=0;
-			mpz_class radix=1;
-			m_i=0;
-			for(list<int>::iterator m_iter=m_prvocisla.begin();m_iter!=m_prvocisla.end();m_iter++)
-			{
-				//cout << "+" << m_prava_strana[m_i][y] <<"*" << radix;
-				//m_prava_strana[m_i][y]
-				citatel+=m_prava_strana[m_i][y]*radix;
-				jmenovatel+=m_diagonala[m_i][y]*radix;
-				radix*=(*m_iter);
+		// zpetny_prevod(m_r, m_prava_strana, m_diagonala, 
 
-				m_i++;
-			}
-			//cout << endl;
-			prava_strana[y]=citatel.get_d()/jmenovatel.get_d();
-			//cout << citatel << "/" << endl << jmenovatel << " = " << prava_strana[y] << endl;
-			m_i=0;
-			for(list<int>::iterator m_iter=m_prvocisla.begin();m_iter!=m_prvocisla.end();m_iter++)
-			{
-				mpz_class a=(*m_iter);
-				mpz_class m=citatel % a;
-				double m_citatel=m.get_d();
-				m=jmenovatel % a;
-				double m_jmenovatel=m.get_d();
-				m_prava_strana[m_i][y]==m_citatel;
-				m_diagonala[m_i][y]==m_jmenovatel;
-				m_i++;
-			}
-		}
-
-		//delete[] sieve;
-		for(int i=0;i<m_prvocisla.size();i++)
+		
+		//for(int i=m_r-1;i>=0;i--)
 		{
-			//delete[] m_prava_strana[m_i];
-			//delete[] m_diagonala[m_i];
+			delete[] *m_prava_strana;
+			delete[] *m_diagonala;
 		}
-		//delete[] m_prava_strana;
-		//delete[] m_diagonala;
+		delete[] m_prava_strana;
+		delete[] m_diagonala;
 		//*/
 	}
 	void vypsat()
@@ -567,7 +549,7 @@ public:
 template<class T>
 int ifrexp(T X, int * Y)
 {
-	float a=frexp(X, Y);
+	T a=frexp(X, Y);
 	int exponent;
 	for(exponent=1;exponent<numeric_limits<T>::digits;exponent++)
 	{
