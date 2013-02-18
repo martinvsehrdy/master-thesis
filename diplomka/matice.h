@@ -227,6 +227,35 @@ public:
 			set_cell(ipivot, ipivot, 1.0);
 		}
 	}
+	/*
+	 * vynasobi radky tak, aby kazde cislo melo za desetinou carkou pouze nuly
+	 */
+	void vstupni_slr();	// int N, T* matice, T* prava_strana
+	/*
+	 * spocita hadamarduv odhad a modul M
+	 */
+	void exec_hadamard(mpz_class* hadamard, mpz_class* modul_M);	// int N,  T* matice, T* prava_strana
+	/*
+	 * rozlozi modul M na soucin jednotlivych modulu vzajemne nesoudelnych
+	 * r - pocet jednotlivych modulu
+	 * moduly - pole jednotlivych modulu
+	 * M - vstupni modul M
+	 */
+	void exec_moduly(int* r, int* moduly, mpz_class modul_M);	// int N,  T* matice, T* prava_strana
+	/*
+	 * vytvori SLR v modulu "modul", zmoduluje vstupní SLR
+	 * modul - vybrany jednotlivy modul
+	 * m_matice - tady bude matice modularnich zbytku
+	 * m_prava_strana - prava strana   - || -
+	 */
+	void rozklad_slr_mod(int modul, int* m_matice, int* m_prava_strana);
+
+	void gauss_jordan_elim(int modul, int* m_matice, int* m_prava_strana, int* m_vys_citatel, int* m_vys_jmenovatel);
+	/*
+	 * r - pocet jednotlivych modulu
+	 * 
+	 */
+	void zpetny_prevod(int r, int** vys_citatel, int** vys_jmenovatel, T* vysledek);
 	void do_modular(void)
 	{
 		if(pointer==NULL || prava_strana==NULL) return;

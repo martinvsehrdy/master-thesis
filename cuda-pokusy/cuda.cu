@@ -51,6 +51,11 @@ int main(char** argv, int argc)
 }
 
 
+void gauss_jordan_elim(int modul, int* m_matice, int* m_prava_strana, int* m_vys_citatel, int* m_vys_jmenovatel)
+{
+
+}
+
 void print_gpus_info(void)
 {
 	cudaDeviceProp prop;
