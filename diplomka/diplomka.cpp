@@ -11,6 +11,9 @@
 
 using namespace std;
 
+double* A=NULL;
+double* b=NULL;
+double* x=NULL;
 
 int main(int argc, char** argv)
 // argv[0]
@@ -26,14 +29,13 @@ int main(int argc, char** argv)
 	return 0;
 	/*/
 
-	int size=0;
 	int metoda=0;
 	try
 	{
 		if(argc>2)
 		{
 			metoda=atoi(argv[1]);
-			size=atoi(argv[2]);
+			N=atoi(argv[2]);
 		}else throw;
 	}catch(...)
 	{
@@ -42,22 +44,24 @@ int main(int argc, char** argv)
 	}
 
 
-	matice<double> mat(size);
+	A = new double[N*N];
+	b = new double[N];
 	
-	mat.fill_hilbert();
-	//mat.load_matrix("mat1.txt");
+	fill_hilbert(N, A, b);
+	vypsat(N, A, b);
 	
-	mat.vypsat();
 	switch(metoda)
 	{
-	case 1: mat.do_gauss();
+	case 1: do_gauss(N, A, b);
 		break;
-	case 2: mat.do_modular();
+	case 2: do_modular(N, A, b);
 		break;
 	}
 	cout << "VYSLEDEK:" << endl;
-	mat.vypsat();
+	vypsat(N, A, b);
 	
+	delete A;
+	delete b;
 	cin.get();
 	return 0;//*/
 }
