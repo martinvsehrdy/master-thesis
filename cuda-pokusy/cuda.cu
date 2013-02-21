@@ -11,48 +11,51 @@
 
 using namespace std;
 
+
 void print_gpus_info(void);
-__global__ void kernel1(double* pole, int N)
+void print_cuda_err(cudaError_t cudaErr);
+
+#define T double
+
+__global__ void modulovat(int N, int* pole, int modul)
 {
-	int id=threadIdx.x;
-	while( id<N )
-	{
-		pole[id]=1.0;
-		id+=1024;
-	}
+	int tid=threadIdx.x;
+	if(tid<N) pole[tid]=pole[tid] % modul;
 }
+
+cudaError_t cudaErr;
 
 int main(char** argv, int argc)
 {
-	int N=100;
-	int sum=0;
-	
-	double* A=new double[N*N];
-	double* b=new double[N];
-
-	double* cuda_A;
-	cudaMalloc((void**)cuda_A, N*N*sizeof(double));
-	double* cuda_b;
-	cudaMalloc((void**)cuda_b, N*sizeof(double));
-
+	int N=10;
+	int* A=new int[N*N];
+	int* b=new int[N];
 
 	for(int i=0;i<N;i++)
 	{
-		A[i]=i;
-		sum+=i;
+		b[i] = rand()-15000;
+		cout << b[i] << "\t";
 	}
-	for(int i=0;i<N;i++) cout << A[i] << "\t";
-	double* cudaA;
-	cudaMalloc((void**)&cudaA, N*sizeof(double));
-	cudaMemcpy(cudaA, A, N*sizeof(double), cudaMemcpyHostToDevice);
-	kernel1<<<1,1024>>>(cudaA, N);
-	cout << endl;
-	cudaMemcpy(A, cudaA, N*sizeof(double), cudaMemcpyDeviceToHost);
-	cudaFree(cudaA);
-	for(int i=0;i<N;i++) cout << A[i] << "\t";
+	
 
-	delete[] A;
+	int* cuda_A;
+	cudaMalloc((void**)&cuda_A, N*N*sizeof(int));
+	cudaMemcpy(cuda_A, A, N*N*sizeof(int), cudaMemcpyHostToDevice);
+	int* cuda_b=NULL;
+	cudaMalloc((void**)&cuda_b, N*sizeof(int));
+	cudaErr=cudaMemcpy(cuda_b, b, N*sizeof(int), cudaMemcpyHostToDevice);
+	print_cuda_err(cudaErr);
+	modulovat<<<1,1024>>>(N, cuda_b, 11);
+	cout << endl << endl;
+	for(int i=0;i<N;i++) b[i] = 0;
 
+	cudaErr=cudaMemcpy(b, cuda_b, N*sizeof(int), cudaMemcpyDeviceToHost);
+	print_cuda_err(cudaErr);
+	
+	cudaFree(cuda_b);
+	for(int i=0;i<N;i++) cout << b[i] << "\t";
+
+	delete[] b;
 
 #ifdef _DEBUG
 	cin.get();
@@ -114,6 +117,21 @@ void print_gpus_info(void)
 		prop.maxGridSize[0], prop.maxGridSize[1],
 		prop.maxGridSize[2] );
 		printf( "\n" );
+	}
+}
+
+void print_cuda_err(cudaError_t cudaErr)
+{
+	switch(cudaErr)
+	{
+	case cudaSuccess: cout << "cudaSuccess";
+		break;
+	case cudaErrorInvalidValue: cout << "cudaErrorInvalidValue";
+		break;
+	case cudaErrorInvalidDevicePointer: cout << "cudaErrorInvalidDevicePointer";
+		break;
+	case cudaErrorInvalidMemcpyDirection: cout << "cudaErrorInvalidMemcpyDirection";
+		break;
 	}
 }
 

@@ -6,18 +6,12 @@
 #include <iostream>
 #include <fstream>
 #include <list>
+#include "global.h"
 
 using namespace std;
 
-#pragma warning(disable: 4800; disable: 4244)
-#include <mpirxx.h>
-#pragma warning(default: 4244; default: 4800)
 
-#define T	double
-
-int N;
-
-int ifrexp(T X, int * Y);
+int ifrexp(TYPE X, int * Y);
 int m_inv(int modulo, int cislo);
 
 
@@ -25,7 +19,7 @@ int get_index(int X, int Y)	// SLOUPEC, RADEK
 {
 	return X*N+Y;
 }
-void fill_random(int N, T* matice, T* prava_strana)
+void fill_random(int N, TYPE* matice, TYPE* prava_strana)
 {
 	srand( time(NULL) );
 	for(int i=0;i<N*N;i++)
@@ -37,19 +31,19 @@ void fill_random(int N, T* matice, T* prava_strana)
 		prava_strana[i]=(rand() % 1000 + 1)/10.0;
 	}
 }
-void fill_hilbert(int N, T* matice, T* prava_strana)
+void fill_hilbert(int N, TYPE* matice, TYPE* prava_strana)
 {
 	for(int y=0;y<N;y++)
 	{
 		for(int x=0;x<N;x++)
 		{
-			T val=1.0/((T)(1+x+y));
+			TYPE val=1.0/((TYPE)(1+x+y));
 			matice[get_index(x, y)] = val;
 		}
 		prava_strana[y]=(y+1)*(y+1);
 	}
 }
-void save_matrix(int N, T* matice, T* prava_strana, char* filename)
+void save_matrix(int N, TYPE* matice, TYPE* prava_strana, char* filename)
 {
 	fstream file;
 	file.open(filename, fstream::out);
@@ -64,7 +58,7 @@ void save_matrix(int N, T* matice, T* prava_strana, char* filename)
 	}
 	file.close();
 }
-int load_matrix(int N, T* matice, T* prava_strana, char* filename)
+int load_matrix(int N, TYPE* matice, TYPE* prava_strana, char* filename)
 {
 	//FILE* file;
 	fstream file;
@@ -78,11 +72,11 @@ int load_matrix(int N, T* matice, T* prava_strana, char* filename)
 	{
 		N=newN;
 		if(matice!=NULL) delete matice;
-		matice=new T[N*N];
+		matice=new TYPE[N*N];
 		if(prava_strana!=NULL) delete prava_strana;
-		prava_strana=new T[N];
+		prava_strana=new TYPE[N];
 	}
-	T a;
+	TYPE a;
 	for(int y=0;y<N;y++)
 	{
 		for(int x=0;x<N;x++)
@@ -99,7 +93,7 @@ int load_matrix(int N, T* matice, T* prava_strana, char* filename)
 	file.close();
 	return 0;
 }
-void do_gauss(int N, T* matice, T* prava_strana)
+void do_gauss(int N, TYPE* matice, TYPE* prava_strana)
 {
 	for(int ipivot=0;ipivot<N;ipivot++)
 	{
@@ -150,7 +144,7 @@ void do_gauss(int N, T* matice, T* prava_strana)
 /*
  * vynasobi radky tak, aby kazde cislo melo za desetinou carkou pouze nuly
  */
-void vstupni_slr(int N, T* matice, T* prava_strana)
+void vstupni_slr(int N, TYPE* matice, TYPE* prava_strana)
 {
 	// prenasobeni radku matice, aby za desetinou carkou byly jen nuly
 	for(int y=0;y<N;y++)
@@ -166,7 +160,7 @@ void vstupni_slr(int N, T* matice, T* prava_strana)
 				min_exponent=exponent;
 			}
 		}
-		T pom=frexp(prava_strana[y], &exponent);
+		TYPE pom=frexp(prava_strana[y], &exponent);
 		prava_strana[y]=ldexp(pom, exponent - min_exponent);
 		for(int x=0;x<N;x++)
 		{
@@ -178,7 +172,7 @@ void vstupni_slr(int N, T* matice, T* prava_strana)
 /*
  * spocita hadamarduv odhad a modul M
  */
-void exec_hadamard(int N,  T* matice, T* prava_strana, mpz_class* hadamard, T* modul_M)
+void exec_hadamard(int N,  TYPE* matice, TYPE* prava_strana, mpz_class* hadamard, TYPE* modul_M)
 {
 	// hadamard
 	mpz_class D_hadamard1=1;
@@ -205,8 +199,8 @@ void exec_hadamard(int N,  T* matice, T* prava_strana, mpz_class* hadamard, T* m
 	*hadamard=sqrt(D_hadamard1);
 
 	// spocitat 'M'
-	T max_a=matice[get_index(0,0)];
-	T max_y=prava_strana[0];
+	TYPE max_a=matice[get_index(0,0)];
+	TYPE max_y=prava_strana[0];
 	for(int y=0;y<N;y++)
 	{
 		for(int x=0;x<N;x++)
@@ -221,8 +215,8 @@ void exec_hadamard(int N,  T* matice, T* prava_strana, mpz_class* hadamard, T* m
 			max_y=prava_strana[y];
 		}
 	}
-	T M1=pow((T)N, N/2)*pow(max_a, N);
-	T M2=N*pow((T)(N-1), (N-1)/2)*pow(max_a, N-1)*max_y;
+	TYPE M1=pow((TYPE)N, N/2)*pow(max_a, N);
+	TYPE M2=N*pow((TYPE)(N-1), (N-1)/2)*pow(max_a, N-1)*max_y;
 	*modul_M=2*max(M1, M2);
 }
 /*
@@ -231,7 +225,7 @@ void exec_hadamard(int N,  T* matice, T* prava_strana, mpz_class* hadamard, T* m
  * moduly - pole jednotlivych modulu
  * M - vstupni modul M
  */
-void exec_moduly(int N,  T* matice, T* prava_strana, mpz_class hadamard, T modul_M, int* r, int** moduly)
+void exec_moduly(int N,  TYPE* matice, TYPE* prava_strana, mpz_class hadamard, TYPE modul_M, int* r, int** moduly)
 {
 	int poc_sieve;
 	frexp(modul_M, &poc_sieve);
@@ -318,7 +312,7 @@ void exec_moduly(int N,  T* matice, T* prava_strana, mpz_class hadamard, T modul
  * m_matice - tady bude matice modularnich zbytku
  * m_prava_strana - prava strana   - || -
  */
-void rozklad_slr_mod(int N,  T* matice, T* prava_strana, int modul, int* m_matice, int* m_prava_strana)
+void rozklad_slr_mod(int N,  TYPE* matice, TYPE* prava_strana, int modul, int* m_matice, int* m_prava_strana)
 {
 	for(int x=0;x<N;x++)	// TODO: paralelizovat tenhle nebo
 	{
@@ -406,11 +400,11 @@ void gauss_jordan_elim(int N, int modul, int* m_matice, int* m_prava_strana, int
 /*
  * r - pocet jednotlivych modulu
  */
-void zpetny_prevod(int r, int** vys_citatel, int** vys_jmenovatel, T* vysledek)
+void zpetny_prevod(int r, int** vys_citatel, int** vys_jmenovatel, TYPE* vysledek)
 {
 }
 
-void do_modular(int N,  T* matice, T* prava_strana)
+void do_modular(int N,  TYPE* matice, TYPE* prava_strana)
 {
 	if(matice==NULL || prava_strana==NULL) return;
 		
@@ -418,7 +412,7 @@ void do_modular(int N,  T* matice, T* prava_strana)
 		
 	cout << "\nhadamard = ";
 	mpz_class D_hadamard;
-	T M;
+	TYPE M;
 	exec_hadamard(N, matice, prava_strana, &D_hadamard, &M);
 	cout << D_hadamard << "; M = " << M << endl;
 
@@ -481,27 +475,33 @@ void do_modular(int N,  T* matice, T* prava_strana)
 	delete[] m_diagonala;
 	//*/
 }
-void vypsat(int N, T* matice, T* prava_strana)
+template<class T>
+void vypsat1(int N, T* matice, T* prava_strana)
 {
-	printf("\n");
+	cout << endl;
 	for(int y=0;y<min(N,6);y++)
 	{
 		int x;
 		for(x=0;x<min(N,5);x++)
 		{
-			printf("%7.2f ", matice[get_index(x, y)]);
+			cout.precision(7);
+			cout << matice[get_index(x, y)] << "\t";
 		}
-		if(x<N-1) printf("...");
-		printf("| %7.2f\n", prava_strana[y]);
+		if(x<N-1) cout << "...";
+		cout << "| " << prava_strana[y] << endl;
 	}
+}
+void vypsat(int N, TYPE* matice, TYPE* prava_strana)
+{
+	vypsat1<TYPE>(N, matice, prava_strana);
 }
 
 // frexp, ldexp
-int ifrexp(T X, int * Y)
+int ifrexp(TYPE X, int * Y)
 {
-	T a=frexp(X, Y);
+	TYPE a=frexp(X, Y);
 	int exponent;
-	for(exponent=1;exponent<numeric_limits<T>::digits;exponent++)
+	for(exponent=1;exponent<numeric_limits<TYPE>::digits;exponent++)
 	{
 		a=2.0*a;
 		if( a == floor(a) ) break;
