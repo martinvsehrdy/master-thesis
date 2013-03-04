@@ -87,25 +87,23 @@ void gauss_jordan_elim_for(int N, int modul, int* m_matice, int* m_prava_strana,
 				return;
 			}
 		}
-		// TODO: odstranit m_inv(...) => budu jenom nasobit
-		int inverzni=m_inv(modul, m_matice[get_index(ipivot, ipivot, N)]);
-
+		int multipl1 = m_matice[get_index(ipivot, ipivot, N)];
 		for(int iY=0;iY<N;iY++)	// prochazi jednotlive radky
 		{
 			if(iY==ipivot) continue;
 			int pom;
-			int multipl=(m_matice[get_index(ipivot, iY, N)]*inverzni) % modul;
+			int multipl2 = m_matice[get_index(ipivot, iY, N)];
 			for(int iX=0;iX<N;iX++)	// prochazi cisla v i1-tem radku
 			{
 				int m1=m_matice[get_index(iX, iY, N)];
 				int m2=m_matice[get_index(iX, ipivot, N)];
 				// TODO: jak cuda moduluje hlavne zaporny cisla? potrebuju interval <0;modul)
-				pom = m1-multipl*m2;
+				pom = multipl1*m1-multipl2*m2;
 				pom=pom % modul;
 				//if(pom<0) pom+=modul;
 				m_matice[get_index(iX, iY, N)]=pom;
 			}
-			pom = m_prava_strana[iY]-multipl*m_prava_strana[ipivot];
+			pom = multipl1*m_prava_strana[iY]-multipl2*m_prava_strana[ipivot];
 			// TODO: jak cuda moduluje hlavne zaporny cisla? potrebuju interval <0;modul)
 			m_prava_strana[iY]=pom % modul;
 			//if(m_prava_strana[iY]<0) m_prava_strana[iY]+=modul;
@@ -124,17 +122,6 @@ void gauss_jordan_elim_while(int N, int modul, int* m_matice, int* m_prava_stran
 	
 }
 
-int m_inv(int modulo, int cislo)
-{
-	// TODO
-	if(cislo==0) return 0;
-	int i;
-	for(i=1;i<=modulo;i++)
-	{
-		if( (cislo*i)% modulo==1 ) break;
-	}
-	return i;
-}
 int get_index(int X, int Y, int N)	// SLOUPEC, RADEK
 {
 	return X*N+Y;

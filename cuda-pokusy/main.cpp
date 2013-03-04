@@ -18,7 +18,7 @@ int main(char** argv, int argc)
 	int* jm=new int[N];
 	//for(int i=0;i<N*N;i++) A[i]=0;
 
-	load_matrix(&N, &A, &b, "../diplomka/mat-int.txt");
+	load_matrix(&N, &A, &b, "mat1.txt");
 	cout << N << endl;
 	vypsat_mat(N, A, b);
 	

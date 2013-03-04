@@ -10,17 +10,6 @@ __global__ void cuda_kernel(int N, int modul,  int* m_matice, int* m_prava_stran
 void cuda_gauss_jordan_elim(int N, int modul, int* m_matice, int* m_prava_strana, int* m_vys_jmenovatel);
 __device__ int cuda_get_index(int X, int Y, int N);
 
-__device__ int cuda_m_inv(int modulo, int cislo)
-{
-	// TODO
-	if(cislo==0) return 0;
-	int i;
-	for(i=1;i<=modulo;i++)
-	{
-		if( (cislo*i)% modulo==1 ) break;
-	}
-	return i;
-}
 
 template<class T>
 __global__ void modulovat(int N, T* poleIn, int* poleOut, int modul)
