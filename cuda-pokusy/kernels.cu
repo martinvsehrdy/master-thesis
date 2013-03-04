@@ -1,15 +1,15 @@
 #include <stdio.h>
 #include <iostream>
-
+#include <cuda.h>
 #include <cuda_runtime.h>
 
 
 using namespace std;
 
-__global__ void cuda_kernel(int N, int modul,  int* m_matice, int* m_prava_strana, int* m_vys_jmenovatel);
-void cuda_gauss_jordan_elim(int N, int modul, int* m_matice, int* m_prava_strana, int* m_vys_jmenovatel);
-__device__ int cuda_get_index(int X, int Y, int N);
-
+__device__ int cuda_get_index(int X, int Y, int N)
+{
+	return X*N+Y;
+}
 
 template<class T>
 __global__ void modulovat(int N, T* poleIn, int* poleOut, int modul)
@@ -20,6 +20,121 @@ __global__ void modulovat(int N, T* poleIn, int* poleOut, int modul)
 		poleOut[tid]=((int)poleIn[tid]) % modul;
 		tid+=blockDim.x;
 	}
+}
+
+__global__ void kernel1(int N, int modul,  int* m_matice, int* m_prava_strana, int* m_vys_jmenovatel)
+{
+	int tid=threadIdx.x;
+	int itid;
+	for(int ipivot=0;ipivot<N;ipivot++)
+	{
+		// deleni nulou => nasobeni inverznim prvkem
+		if(m_matice[cuda_get_index(ipivot, ipivot, N)]==0)
+		{
+			// v 'ipivot'-tem radku na diagonále je nula => vymena s jinym radkem
+			int novy_pivot=ipivot;
+			do{
+				novy_pivot++;
+			}while(m_matice[cuda_get_index(ipivot, novy_pivot, N)]==0 && novy_pivot<N);
+
+			if(m_matice[cuda_get_index(ipivot, novy_pivot, N)]!=0 && novy_pivot<N)		// nasel jsem radek s nenulovym prvkem ve sloupci ipivot
+			{
+				// vymena radku ipivot a novy_pivot
+				int pom;
+				itid=tid;
+				while(itid<=N)
+				{
+					if(itid==N)
+					{
+						pom=m_prava_strana[ipivot];
+						m_prava_strana[ipivot]=m_prava_strana[novy_pivot];
+						m_prava_strana[novy_pivot]=pom;
+					}else
+					{
+						pom=m_matice[cuda_get_index(itid, ipivot, N)];
+						m_matice[cuda_get_index(itid, ipivot, N)]=m_matice[cuda_get_index(itid, novy_pivot, N)];
+						m_matice[cuda_get_index(itid, novy_pivot, N)]=pom;
+					}
+					itid+=blockDim.x;
+				}
+			}else
+			{
+				// matice nema v 'ipivot'-tem sloupci nenulovy prvek => je singularni
+				//cout << "singularni" << endl;
+				itid=tid;
+				while(itid<=N)	// singularni matice => vysledky jsou nulove (nepouzitelne)
+				{
+					m_prava_strana[itid]=0;
+					m_vys_jmenovatel[itid]=1;
+					itid+=blockDim.x;
+				}
+				return;
+			}
+		}
+		int multipl1 = m_matice[cuda_get_index(ipivot, ipivot, N)];
+		//*/
+		itid=tid;
+		while(itid<N)	// prochazi jednotlive radky
+		{
+			if(itid==ipivot)
+			{
+				itid+=blockDim.x;
+				continue;
+			}
+			int pom;
+			int multipl2 = m_matice[cuda_get_index(ipivot, itid, N)];
+			for(int iX=0;iX<N;iX++)	// prochazi cisla v i1-tem radku
+			{
+				int m1=m_matice[cuda_get_index(iX, itid, N)];
+				int m2=m_matice[cuda_get_index(iX, ipivot, N)];
+				pom = multipl1*m1-multipl2*m2;
+				pom=pom % modul;
+				m_matice[cuda_get_index(iX, itid, N)]=pom;
+			}
+			pom = multipl1*m_prava_strana[itid]-multipl2*m_prava_strana[ipivot];
+			m_prava_strana[itid]=pom % modul;
+			itid+=blockDim.x;
+		}
+		/*/
+		for(int iY=0;iY<N;iY++)	// prochazi jednotlive radky
+		{
+			if(iY==ipivot) continue;
+			int pom;
+			int multipl2 = m_matice[cuda_get_index(ipivot, iY, N)];
+			itid=tid;
+			while(itid<N)	// prochazi cisla v i1-tem radku
+			{
+				int m1=m_matice[cuda_get_index(itid, iY, N)];
+				int m2=m_matice[cuda_get_index(itid, ipivot, N)];
+				// TODO: jak cuda moduluje hlavne zaporny cisla? potrebuju interval <0;modul)
+				pom = multipl1*m1-multipl2*m2;
+				pom=pom % modul;
+				//if(pom<0) pom+=modul;
+				m_matice[cuda_get_index(itid, iY, N)]=pom;
+				itid+=blockDim.x;
+			}
+			pom = multipl1*m_prava_strana[iY]-multipl2*m_prava_strana[ipivot];
+			// TODO: jak cuda moduluje hlavne zaporny cisla? potrebuju interval <0;modul)
+			m_prava_strana[iY]=pom % modul;
+			//if(m_prava_strana[iY]<0) m_prava_strana[iY]+=modul;
+		}//*/
+		
+		// TODO: _syncthread();
+	}
+	// ulozit diagonalu do m_vys_jmenovatel
+	itid=tid;
+	while(itid<N)
+	{
+		m_vys_jmenovatel[itid]=m_matice[cuda_get_index(itid, itid, N)];
+		itid+=blockDim.x;
+	}
+	
+}
+void cuda_gauss_jordan_elim(int N, int modul, int* m_matice, int* m_prava_strana, int* m_vys_jmenovatel)
+{
+	// TODO: posouvat cisla v radcich doleva, kvuli CUDA, aby se pristupovalo stale na ty stejna mista v pameti, 
+	//       vysledek bude v prvnim sloupci matice
+	kernel1<<<1,32>>>(N, modul, m_matice, m_prava_strana, m_vys_jmenovatel);
 }
 
 void print_gpus_info(void)
