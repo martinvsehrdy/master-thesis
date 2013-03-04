@@ -3,15 +3,10 @@
 #include <stdlib.h>
 #include <iostream>
 #include <cuda.h>
-#include "kernels.h"
+//#include "kernels.h"
 #include "kernels_cpu.h"
-#include <cuda_runtime.h>
 
 using namespace std;
-
-cudaError_t cudaErr;
-#define T double
-
 
 
 
@@ -20,12 +15,16 @@ int main(char** argv, int argc)
 	int N=10;
 	int* A=new int[N*N];
 	int* b=new int[N];
+	int* jm=new int[N];
+	//for(int i=0;i<N*N;i++) A[i]=0;
 
-	load_matrix<int>(&N, A, b, "../diplomka/mat1.txt");
+	load_matrix(&N, &A, &b, "../diplomka/mat-int.txt");
 	cout << N << endl;
-	//vypsat_mat<int>(N, A, b);
+	vypsat_mat(N, A, b);
 	
+	gauss_jordan_elim_for(N, 100001, A, b, jm);
 
+	vypsat_vys(N, b, jm);
 	/*
 	int* cuda_A;
 	cudaMalloc((void**)&cuda_A, N*N*sizeof(int));
@@ -39,12 +38,12 @@ int main(char** argv, int argc)
 
 	//cudaFree(cuda_b);
 	
-	delete[] A;
-	delete[] b;
 
 #ifdef _DEBUG
 	cin.get();
+#else
+	delete[] A;
+	delete[] b;
+	delete[] jm;
 #endif
 }
-
-
