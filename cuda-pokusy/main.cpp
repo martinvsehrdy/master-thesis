@@ -10,7 +10,7 @@
 
 using namespace std;
 
-#define POC_OPAKOVANI 5
+#define POC_OPAKOVANI 10
 float cuda_time1, cuda_time2, cuda_time3;
 cudaError cudaErr;
 
@@ -80,6 +80,8 @@ int main(int argc, char** argv)
 	int* A=new int[N*N];
 	int* b=new int[N];
 	int* jm=new int[N];
+	int* b1=new int[N];
+	int* jm1=new int[N];
 	int vysledek=8;
 	// inicializace CUDA
 	init_gpu_compute();
@@ -114,6 +116,13 @@ int main(int argc, char** argv)
 		cudaErr=cudaEventRecord(event2, 0);
 		cudaErr=cudaEventSynchronize(event2);
 		cudaErr=cudaEventElapsedTime(&cuda_time1, event1, event2);
+
+		for(int i=0;i<N;i++)
+		{
+			b1[i]=b[i];
+			jm1[i]=jm[i];
+		}
+		gauss_jordan_elim_for(N, modul, A, b1, jm1);
 		// vypocet v CUDA
 		cudaErr=cudaEventRecord(event1, 0);
 		cuda_gauss_jordan_elim(N, modul, cuda_A, cuda_b, cuda_jm, cudaVysl);
@@ -136,8 +145,19 @@ int main(int argc, char** argv)
 			time_arr[2].push_back(cuda_time2);
 			time_arr[1].push_back(cuda_time3);
 		}
+		// kontrola spravnosti
+		bool spravne=true;
+		int ss=0;
+		for(int i=0;i<N;i++)
+		{
+			if(b1[i]!=b[i] || jm1[i]!=jm[i])
+			{
+				ss+=abs(b1[i]-b[i]) + abs(jm1[i]-jm[i]);
+			}
+		}
+		if(ss>0) cout << ss << "X";
 		//cout << "vysledek z CUDA vypoctu (" << opakovani << "): " << vysledek << endl;
-
+		cudaDeviceSynchronize();
 	}
 	// zjistovani casu
 	

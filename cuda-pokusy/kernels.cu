@@ -35,18 +35,25 @@ __global__ void kernel_gauss_jordan_elim(int N, int modul,  int* m_matice, int* 
 {
 	int tid=threadIdx.x;
 	int itid;
+	__shared__ int novy_pivot;
 	for(int ipivot=0;ipivot<N;ipivot++)
 	{
-		// deleni nulou => nasobeni inverznim prvkem
-		if(m_matice[cuda_get_index(ipivot, ipivot, N)]==0)
+		// thread tid==0 se stara o novy_pivot := nejvyse polozeny radek obsahujici nenulove cislo v "ipivot"-tem sloupci
+		if(tid==0)
 		{
-			// v 'ipivot'-tem radku na diagonále je nula => vymena s jinym radkem
-			int novy_pivot=ipivot;
-			do{
-				novy_pivot++;
-			}while(m_matice[cuda_get_index(ipivot, novy_pivot, N)]==0 && novy_pivot<N);
-
-			if(m_matice[cuda_get_index(ipivot, novy_pivot, N)]!=0 && novy_pivot<N)		// nasel jsem radek s nenulovym prvkem ve sloupci ipivot
+			novy_pivot=ipivot;
+			if(m_matice[cuda_get_index(ipivot, ipivot, N)]==0)
+			{
+				do{
+					novy_pivot++;
+				}while(m_matice[cuda_get_index(ipivot, novy_pivot, N)]==0 && novy_pivot<N);
+			}
+		}
+		__syncthreads();
+		// v 'ipivot'-tem radku na diagonále je nula => vsichni musi vymenit radky
+		if(ipivot!=novy_pivot)
+		{
+			if(novy_pivot<N)
 			{
 				// vymena radku ipivot a novy_pivot
 				int pom;
@@ -68,21 +75,20 @@ __global__ void kernel_gauss_jordan_elim(int N, int modul,  int* m_matice, int* 
 				}
 			}else
 			{
-				// matice nema v 'ipivot'-tem sloupci nenulovy prvek => je singularni
-				*retval=1;
-				//cout << "singularni" << endl;
-				itid=tid;
-				while(itid<=N)	// singularni matice => vysledky jsou nulove = nepouzitelne, nemusi to tu byt
+				// matice je singularni
+				if(tid==0)
 				{
-					m_prava_strana[itid]=0;
-					m_vys_jmenovatel[itid]=1;
-					itid+=blockDim.x;
+					*retval=1;
+					return;
 				}
-				return;
 			}
 		}
+		__syncthreads();
+
+
 		int multipl1 = m_matice[cuda_get_index(ipivot, ipivot, N)];
 		//*/
+		// vlakno se stara o jeden cely radek a pak jde na dalsi radek
 		itid=tid;
 		while(itid<N)	// prochazi jednotlive radky
 		{
@@ -106,30 +112,33 @@ __global__ void kernel_gauss_jordan_elim(int N, int modul,  int* m_matice, int* 
 			itid+=blockDim.x;
 		}
 		/*/
+		// vsichni delaji na jednom radku s tim, ze si prvky rozdeli mezi sebe
 		for(int iY=0;iY<N;iY++)	// prochazi jednotlive radky
 		{
 			if(iY==ipivot) continue;
 			int pom;
 			int multipl2 = m_matice[cuda_get_index(ipivot, iY, N)];
 			itid=tid;
-			while(itid<N)	// prochazi cisla v i1-tem radku
+			while(itid<=N)	// prochazi cisla v i1-tem radku
 			{
-				int m1=m_matice[cuda_get_index(itid, iY, N)];
-				int m2=m_matice[cuda_get_index(itid, ipivot, N)];
-				// TODO: jak cuda moduluje hlavne zaporny cisla? potrebuju interval <0;modul)
-				pom = multipl1*m1-multipl2*m2;
-				pom=pom % modul;
-				//if(pom<0) pom+=modul;
-				m_matice[cuda_get_index(itid, iY, N)]=pom;
+				if(tid==N)
+				{
+					pom = multipl1*m_prava_strana[iY]-multipl2*m_prava_strana[ipivot];
+					m_prava_strana[iY]=pom % modul;
+				}else
+				{
+					// m1=m_matice[cuda_get_index(itid, iY, N)];	m2=m_matice[cuda_get_index(itid, ipivot, N)];	pom = multipl1*m1-multipl2*m2;
+					pom = multipl1*m_matice[cuda_get_index(itid, iY, N)]-multipl2*m_matice[cuda_get_index(itid, ipivot, N)];
+					pom=pom % modul;
+					m_matice[cuda_get_index(itid, iY, N)]=pom;
+				}
 				itid+=blockDim.x;
 			}
-			pom = multipl1*m_prava_strana[iY]-multipl2*m_prava_strana[ipivot];
-			// TODO: jak cuda moduluje hlavne zaporny cisla? potrebuju interval <0;modul)
-			m_prava_strana[iY]=pom % modul;
+			
 			//if(m_prava_strana[iY]<0) m_prava_strana[iY]+=modul;
+			__syncthreads();
 		}//*/
-		
-		// TODO: _syncthread();
+		__syncthreads();
 	}
 	// ulozit diagonalu do m_vys_jmenovatel
 	itid=tid;
