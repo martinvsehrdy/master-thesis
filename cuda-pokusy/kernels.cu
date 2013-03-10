@@ -3,6 +3,7 @@
 #include <cuda.h>
 #include <cuda_runtime.h>
 
+static cudaDeviceProp gpu_property;
 
 using namespace std;
 
@@ -21,8 +22,16 @@ __global__ void modulovat(int N, T* poleIn, int* poleOut, int modul)
 		tid+=blockDim.x;
 	}
 }
-
-__global__ void kernel1(int N, int modul,  int* m_matice, int* m_prava_strana, int* m_vys_jmenovatel)
+__global__ void kernel(int N, int* pole, int cislo)
+{
+	int tid=threadIdx.x;
+	while(tid<N)
+	{
+		pole[tid]=5;
+		tid+=blockDim.x;
+	}
+}
+__global__ void kernel_gauss_jordan_elim(int N, int modul,  int* m_matice, int* m_prava_strana, int* m_vys_jmenovatel, int* retval)
 {
 	int tid=threadIdx.x;
 	int itid;
@@ -60,9 +69,10 @@ __global__ void kernel1(int N, int modul,  int* m_matice, int* m_prava_strana, i
 			}else
 			{
 				// matice nema v 'ipivot'-tem sloupci nenulovy prvek => je singularni
+				*retval=1;
 				//cout << "singularni" << endl;
 				itid=tid;
-				while(itid<=N)	// singularni matice => vysledky jsou nulove (nepouzitelne)
+				while(itid<=N)	// singularni matice => vysledky jsou nulove = nepouzitelne, nemusi to tu byt
 				{
 					m_prava_strana[itid]=0;
 					m_vys_jmenovatel[itid]=1;
@@ -128,15 +138,23 @@ __global__ void kernel1(int N, int modul,  int* m_matice, int* m_prava_strana, i
 		m_vys_jmenovatel[itid]=m_matice[cuda_get_index(itid, itid, N)];
 		itid+=blockDim.x;
 	}
-	
+	*retval=0;
 }
-void cuda_gauss_jordan_elim(int N, int modul, int* m_matice, int* m_prava_strana, int* m_vys_jmenovatel)
+void cuda_gauss_jordan_elim(int N, int modul, int* m_matice, int* m_prava_strana, int* m_vys_jmenovatel, int* retval)
 {
 	// TODO: posouvat cisla v radcich doleva, kvuli CUDA, aby se pristupovalo stale na ty stejna mista v pameti, 
 	//       vysledek bude v prvnim sloupci matice
-	kernel1<<<1,32>>>(N, modul, m_matice, m_prava_strana, m_vys_jmenovatel);
-}
+	kernel_gauss_jordan_elim<<<1,gpu_property.maxThreadsPerBlock>>>(N, modul, m_matice, m_prava_strana, m_vys_jmenovatel, retval);
 
+	//kernel<<<1, gpu_property.maxThreadsPerBlock>>>(N, m_prava_strana, 5);
+	
+}
+void init_gpu_compute(void)
+{
+	int count;
+    cudaGetDeviceCount( &count);
+	if (0<count) cudaGetDeviceProperties( &gpu_property, 0);
+}
 void print_gpus_info(void)
 {
 	cudaDeviceProp prop;

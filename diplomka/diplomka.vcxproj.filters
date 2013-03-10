@@ -39,9 +39,4 @@
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
-  <ItemGroup>
-    <CudaCompile Include="cudamodular.cu">
-      <Filter>Source Files</Filter>
-    </CudaCompile>
-  </ItemGroup>
 </Project>
