@@ -48,16 +48,36 @@
 
 \begin{introduction}
 	%sem napište úvod Vaší práce
-Inženýrské úlohy mají za úkol určitým způsobem popsat chování reálného fyzikálního světa. Navíc většina inženýrských úloh nelze vyřešit analyticky. Proto je musíme řešit numericky a tímto postupem zkrátka vznikají chyby, ať chceme nebo ne. Tyto chyby vznikají už samotným měřením neboli převodem spojité fyzikální veličiny např. teploty, vzdálenosti.. na diskrétní hodnoty např. stupně, metry.. K řešení inženýrských úloh používáme počítač, což je další zdroj chyb. V počítači neexistují reálná čísla, pouze jejich podmnožiny v podobě čísel s plovoucí desetinou čárkou. Nejvyužívanější takové podmnožiny se označují $float$ resp. $double$ a mají jednoduchou resp. dvoujtou přesnost.  Všechny výsledky z reálných čísel se zaokrouhlují na čísla z této podmnožiny.
+Inženýrské úlohy mají za úkol určitým způsobem popsat chování reálného fyzikálního světa. Navíc většina inženýrských úloh nelze vyřešit analyticky. Proto je musíme řešit numericky a tímto postupem zkrátka vznikají chyby, ať chceme nebo ne. Tyto chyby vznikají už samotným měřením neboli převodem spojité fyzikální veličiny např. teploty, vzdálenosti.. na diskrétní hodnoty např. stupně, metry.. K řešení inženýrských úloh používáme počítač, což je další zdroj chyb. V počítači neexistují reálná čísla, pouze jejich podmnožiny v podobě čísel s plovoucí desetinou čárkou. Nejvyužívanější takové podmnožiny se označují $float$ resp. $double$ a mají jednoduchou resp. dvojitou přesnost.  Všechny výsledky z reálných čísel se zaokrouhlují na čísla z této podmnožiny.
 Nebo můžeme v počítači využívat podmnožinu celých čísel $integer$, což je průnik celých čísel a relativně k mohutnosti celých čísel malého intervalu.
 V této práci se budeme snažit počítat soustavy lineárních rovnic tak, aby nevznikali chyby zaokrouhlování během výpočtů. To znamená použít matematickou teorii vybudovanou nad matematickým tělesem, které jsme schopni plně a bez chyby reprezentovat a zpracovávat v počítači. Vhodným nástrojem je modulární resp. více-modulární aritmetika.
-Výpočty založených na operacích s maticemi jsou dobře paralelizovatelné a tím se znatelně zrychlý celý výpočet.
+Výpočty založených na operacích s maticemi jsou dobře paralelizovatelné a tím se znatelně zrychlí celý výpočet.
 K implementaci budu využívat technologii CUDA, což je technologie zahrnující do výpočtu výpočetní výkon GPU.
 \end{introduction}
 
 \chapter{Modulární aritmetika}
 
 \chapter{Technologie CUDA}
+
+\chapter{Implementace řešení}
+
+Nyní se pustíme do samotné implementace algoritmů. Základní algoritmus pro řešení SLR je Gaussova eliminace, která převádí matici na horní stupňovitý tvar a poté na jednotkovou matici. My ale použijeme Gauss-Jordanovu eliminaci, která v každém kroku eliminuje podle jednoho řádku - pivotní řádek, a která v každém kroku vytvoří v jednom sloupci samé nuly kromě čísla na diagonále. Gauss-Jordanova eliminace má stejnou složitost \ref jako Gaussova eliminace a navíc se snadněji paralelizuje.
+
+\begin{figure}[h]
+\begin{center}
+\includegraphics[width=10cm]{images/GJM.png}
+\caption{ Znázornění Gauss-Jordanovy metody }
+\label{obr:GJ_slozitost}
+\end{center}
+\end{figure}
+
+
+
+\section{Sekvenční algoritmus}
+
+\subsection{Gauss Jordanův algoritmus}
+
+
 
 \begin{conclusion}
 	%sem napište závěr Vaší práce
@@ -73,6 +93,9 @@ K implementaci budu využívat technologii CUDA, což je technologie zahrnujíc�
 \begin{description}
 	\item[GUI] Graphical user interface
 	\item[XML] Extensible markup language
+	
+	\item[SLR] Soustava lineárních rovnic
+	\item[GJM] Gauss-Jordanova metoda
 \end{description}
 
 
