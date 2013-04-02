@@ -31,10 +31,12 @@ __global__ void kernel(int N, int* pole, int cislo)
 		tid+=blockDim.x;
 	}
 }
+__device__ 
 __global__ void kernel_gauss_jordan_elim(int N, int modul,  int* m_matice, int* m_prava_strana, int* m_vys_jmenovatel, int* retval)
 {
 	int tid=threadIdx.x;
 	int itid;
+	extern __shared__ int sh_pivot[];
 	__shared__ int novy_pivot;
 	for(int ipivot=0;ipivot<N;ipivot++)
 	{
@@ -84,9 +86,22 @@ __global__ void kernel_gauss_jordan_elim(int N, int modul,  int* m_matice, int* 
 			}
 		}
 		__syncthreads();
+		itid=tid;
+		while(itid<=N)
+		{
+			if(itid==N)
+			{
+				sh_pivot[itid]=m_prava_strana[ipivot];
+			}else
+			{
+				sh_pivot[itid]=m_matice[cuda_get_index(itid, ipivot, N)];
+			}
+			itid+=blockDim.x;
+		}
+		__syncthreads();
 
 
-		int multipl1 = m_matice[cuda_get_index(ipivot, ipivot, N)];
+		int multipl1 = sh_pivot[ipivot];
 		//*/
 		// vlakno se stara o jeden cely radek a pak jde na dalsi radek
 		itid=tid;
@@ -101,13 +116,12 @@ __global__ void kernel_gauss_jordan_elim(int N, int modul,  int* m_matice, int* 
 			int multipl2 = m_matice[cuda_get_index(ipivot, itid, N)];
 			for(int iX=0;iX<N;iX++)	// prochazi cisla v i1-tem radku
 			{
-				int m1=m_matice[cuda_get_index(iX, itid, N)];
-				int m2=m_matice[cuda_get_index(iX, ipivot, N)];
-				pom = multipl1*m1-multipl2*m2;
+				// m1=m_matice[cuda_get_index(iX, itid, N)];	int m2=sh_pivot[iX];	pom = multipl1*m1-multipl2*m2;
+				pom = multipl1*m_matice[cuda_get_index(iX, itid, N)]-multipl2*sh_pivot[iX];
 				pom=pom % modul;
 				m_matice[cuda_get_index(iX, itid, N)]=pom;
 			}
-			pom = multipl1*m_prava_strana[itid]-multipl2*m_prava_strana[ipivot];
+			pom = multipl1*m_prava_strana[itid]-multipl2*sh_pivot[N];
 			m_prava_strana[itid]=pom % modul;
 			itid+=blockDim.x;
 		}
@@ -121,14 +135,14 @@ __global__ void kernel_gauss_jordan_elim(int N, int modul,  int* m_matice, int* 
 			itid=tid;
 			while(itid<=N)	// prochazi cisla v i1-tem radku
 			{
-				if(tid==N)
+				if(itid==N)
 				{
-					pom = multipl1*m_prava_strana[iY]-multipl2*m_prava_strana[ipivot];
+					pom = multipl1*m_prava_strana[iY]-multipl2*sh_pivot[itid];
 					m_prava_strana[iY]=pom % modul;
 				}else
 				{
 					// m1=m_matice[cuda_get_index(itid, iY, N)];	m2=m_matice[cuda_get_index(itid, ipivot, N)];	pom = multipl1*m1-multipl2*m2;
-					pom = multipl1*m_matice[cuda_get_index(itid, iY, N)]-multipl2*m_matice[cuda_get_index(itid, ipivot, N)];
+					pom = multipl1*m_matice[cuda_get_index(itid, iY, N)]-multipl2*sh_pivot[itid];
 					pom=pom % modul;
 					m_matice[cuda_get_index(itid, iY, N)]=pom;
 				}
@@ -153,7 +167,7 @@ void cuda_gauss_jordan_elim(int N, int modul, int* m_matice, int* m_prava_strana
 {
 	// TODO: posouvat cisla v radcich doleva, kvuli CUDA, aby se pristupovalo stale na ty stejna mista v pameti, 
 	//       vysledek bude v prvnim sloupci matice
-	kernel_gauss_jordan_elim<<<1,gpu_property.maxThreadsPerBlock>>>(N, modul, m_matice, m_prava_strana, m_vys_jmenovatel, retval);
+	kernel_gauss_jordan_elim<<<1,min(N,gpu_property.maxThreadsPerBlock), (N+1)*sizeof(int)>>>(N, modul, m_matice, m_prava_strana, m_vys_jmenovatel, retval);
 
 	//kernel<<<1, gpu_property.maxThreadsPerBlock>>>(N, m_prava_strana, 5);
 	
