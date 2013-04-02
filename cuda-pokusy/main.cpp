@@ -3,16 +3,12 @@
 #include <stdlib.h>
 #include <iostream>
 #include <list>
-#include <cuda.h>
-#include "kernels.h"
 #include "kernels_cpu.h"
-#include <cuda_runtime.h>
 
 using namespace std;
 
 #define POC_OPAKOVANI 10
 float cuda_time1, cuda_time2, cuda_time3;
-cudaError cudaErr;
 
 void statistic(list<float> l, float* quartal1, float* quartal2, float* quartal3, float* avg)
 {
@@ -80,115 +76,16 @@ int main(int argc, char** argv)
 	int* A=new int[N*N];
 	int* b=new int[N];
 	int* jm=new int[N];
-	int* b1=new int[N];
-	int* jm1=new int[N];
-	int vysledek=8;
-	// inicializace CUDA
-	init_gpu_compute();
-	int* cudaVysl;
-	cudaErr=cudaMalloc((void**)&cudaVysl, sizeof(int));
-	int* cuda_A;
-	cudaErr=cudaMalloc((void**)&cuda_A, N*N*sizeof(int));
-	int* cuda_b=NULL;
-	cudaErr=cudaMalloc((void**)&cuda_b, N*sizeof(int));
-	int* cuda_jm=NULL;
-	cudaErr=cudaMalloc((void**)&cuda_jm, N*sizeof(int));
-	int poc_casu=3;
-	cudaEvent_t event1, event2;
-	cudaErr=cudaEventCreate(&event1);
-	cudaErr=cudaEventCreate(&event2);
-	list<float>* time_arr=new list<float>[poc_casu];
-
-	int poc_opakovani=POC_OPAKOVANI;
-	for(int opakovani=0;opakovani<1000 && poc_opakovani>0;opakovani++)
-	{
-		for(int i=0;i<N*N;i++) A[i]=rand() % modul;
-		for(int i=0;i<N;i++) { b[i]=i; }
-
-		//load_matrix(&N, &A, &b, "../diplomka/mat-int.txt");
-		//cout << N << endl;
-		//vypsat_mat(N, A, b);
-	
-		// kopirovani na GPU
-		cudaErr=cudaEventRecord(event1, 0);
-		cudaErr=cudaMemcpy(cuda_A, A, N*N*sizeof(int), cudaMemcpyHostToDevice);
-		cudaErr=cudaMemcpy(cuda_b, b, N*sizeof(int), cudaMemcpyHostToDevice);
-		cudaErr=cudaEventRecord(event2, 0);
-		cudaErr=cudaEventSynchronize(event2);
-		cudaErr=cudaEventElapsedTime(&cuda_time1, event1, event2);
-
-		for(int i=0;i<N;i++)
-		{
-			b1[i]=b[i];
-			jm1[i]=jm[i];
-		}
-		gauss_jordan_elim_for(N, modul, A, b1, jm1);
-		// vypocet v CUDA
-		cudaErr=cudaEventRecord(event1, 0);
-		cuda_gauss_jordan_elim(N, modul, cuda_A, cuda_b, cuda_jm, cudaVysl);
-		cudaErr=cudaEventRecord(event2, 0);
-		cudaErr=cudaEventSynchronize(event2);
-		cudaEventElapsedTime(&cuda_time2, event1, event2);
-		// kopirovani z GPU
-		cudaErr=cudaEventRecord(event1, 0);
-		cudaErr=cudaMemcpy(&vysledek, cudaVysl, sizeof(int), cudaMemcpyDeviceToHost);
-		cudaErr=cudaMemcpy(b, cuda_b, N*sizeof(int), cudaMemcpyDeviceToHost);
-		cudaErr=cudaMemcpy(jm, cuda_jm, N*sizeof(int), cudaMemcpyDeviceToHost);
-		cudaErr=cudaEventRecord(event2, 0);
-		cudaErr=cudaEventSynchronize(event2);
-		cudaErr=cudaEventElapsedTime(&cuda_time3, event1, event2);
-		// kontrola regularity
-		if (vysledek==0)
-		{
-			poc_opakovani--;
-			time_arr[0].push_back(cuda_time1);
-			time_arr[2].push_back(cuda_time2);
-			time_arr[1].push_back(cuda_time3);
-		}
-		// kontrola spravnosti
-		bool spravne=true;
-		int ss=0;
-		for(int i=0;i<N;i++)
-		{
-			if(b1[i]!=b[i] || jm1[i]!=jm[i])
-			{
-				ss+=abs(b1[i]-b[i]) + abs(jm1[i]-jm[i]);
-			}
-		}
-		if(ss>0) cout << ss << "X";
-		//cout << "vysledek z CUDA vypoctu (" << opakovani << "): " << vysledek << endl;
-		cudaDeviceSynchronize();
-	}
-	// zjistovani casu
-	
-	if(time_arr[0].size()>POC_OPAKOVANI)
-	{
-		cout << "# nedostatecny pocet mereni: " << time_arr[0].size() << " misto " << POC_OPAKOVANI << endl;
-	}
-	float suma=0.0;
-	cout << N << "\t";
-	for(int i=0;i<poc_casu;i++)
-	{
-		time_arr[i].sort();
-		float q1, q3, avg;
-		float med;
-		statistic(time_arr[i], &q1, &med, &q3, &avg);
-		if(i==2) // jedna se o samotnej vypocet => vypisu podrobne
-		{
-			cout << avg << "\t" << time_arr[i].front() << "\t" << q1 << "\t" << med << "\t" << q3 << "\t" << time_arr[i].back() << "\t";
-		}else
-		{
-			cout << med << "\t";
-		}
-		suma+=med;
-	}
-	cout << suma << endl;
+	load_matrix(&N, &A, &b, "../diplomka/mat-int.txt");
+	vypsat_mat(N, A, b);
+	gauss_jordan_elim_while(N, modul, A, b, jm);
 
 
-	//print_gpus_info();
-	cudaFree(cuda_A);
-	cudaFree(cuda_b);
-	cudaFree(cuda_jm);
+	cout << endl << "-------------------------------" << endl;
+	load_matrix(&N, &A, &b, "../diplomka/mat-int.txt");
+	vypsat_mat(N, A, b);
+	gauss_jordan_elim_part(N, modul, A, b, jm);
+
 #ifdef _DEBUG
 	vypsat_vys(N, b, jm);
 	cin.get();
