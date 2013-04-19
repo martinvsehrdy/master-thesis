@@ -10,8 +10,12 @@
 \usepackage[utf8]{inputenc} % LaTeX source encoded as UTF-8
 
 \usepackage{graphicx} %graphics files inclusion
-% \usepackage{amsmath} %advanced maths
-% \usepackage{amssymb} %additional math symbols
+ \usepackage{amsmath} %advanced maths
+ \usepackage{amssymb} %additional math symbols
+ \usepackage{color}
+% \usepackage{tabularx,colortbl}
+% \usepackage[chapter]{algorithm}
+ \usepackage{algorithmic}
 
 \usepackage{dirtree} %directory tree visualisation
 
@@ -22,6 +26,7 @@
 
 \newcommand{\tg}{\mathop{\mathrm{tg}}} %cesky tangens
 \newcommand{\cotg}{\mathop{\mathrm{cotg}}} %cesky cotangens
+\newcommand{\pozn}[1]{ {\color{red}{#1}} }
 
 % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % 
 % ODTUD DAL VSE ZMENTE
@@ -57,15 +62,67 @@ K implementaci budu využívat technologii CUDA, což je technologie zahrnujíc�
 
 \chapter{Modulární aritmetika}
 
+
+\section{Generování prvočísel}
+%\pozn{na 1xxxxxxxxxxxxxx1 je 3095 prvocisel sieve_m=20bytu sieve_v=2052}
+Na více-modulární aritmetiku budu používat jako modula prvočísla. Tím mám zajištěno, že budou mezi sebou nesoudělná. Abych měl co nejméně soustav lineárních kongruencí, budu chtít aby prvočísla byla co největší a zároveň aby se zbytky po dělení vešli do $b$ bitů, viz. . Kvůli násobení při úpravách lineárních kongruencí potřebuji dvounásobek bitů a jeden bit navíc kvůli přetečení při sčítání. CUDA podporuje operace s celými čísly s nejvíce 64bity.
+\begin{eqnarray}
+2 * b + 1 <= 64 \nonumber \\
+b <= 31.5 \nonumber  \\
+b = 31 \nonumber
+\end{eqnarray}
+Ke generování prvočísel použiji Eratosthenovo síto \ref{prg:sito}. Tento algoritmus dokáže určit prvočíselnost u všec celých čísel z intervalu $[0;P] ~ P \in N$. V paměti musím mít u všech takových čísel informaci o prvočíselnosti, stačí jeden bit, který určí zda je nebo není prvočíslo. V případě, že chci určit prvočíselnost až do čísla $2^32-1$, potřebuji 512 MB paměti.
+$2^32 bitů = 2^29 bytů = 2^19 kB = 2^9 MB = 512 MB$.
+Budou mě zajímat hlavně prvočísla z hlavního intervalu $(2^30;2^31)$, ty mají nejvyšší bit $1$. Těch je polovina tzn. 256 MB. Dále můžeme využít faktu, že sudé číslo nemůže být nikdy prvočíslo. Takže stačí 128 MB pro čísla, která mají nejvyšší a nejnižší bit $1$. K výpočtu budeme muset znát prvočíselnost i u čísel nižších než ta v hlavním intervalu, ale pouze u čísel z pomocného intervalu $(0;\sqrt{2^32})$.
+\pozn{TODO: proč stačí $\sqrt{2^32}$}
+Algoritmus bude mít dvě části. V první bude klasický algoritmus Eratosthenova síta spuštěný na pomocném intervalu. Ve druhé části budu procházet čísla z hlavního intervalu a zjišťovat zda je dělitelné některým číslem z pomocného intervalu.
+
+
+\begin{algorithm}[H]
+\caption{pseudokód Eratosthenova síta}
+\label{prg:sito}
+\begin{algorithmic}[1]
+\STATE $PRVOCISLA$ = všechna čísla od $2$ do $P$, kandidáti na prvočísla
+\DO 
+\FOR $PRVOCISLO$ = nejmenší prvočíslo z $PRVOCISLA$
+\WHILE $PRVOCISLO$ < $P$
+	
+
+\STATE $R$ = všechny řádky matice
+\FOR{$krok = 1 \to \lfloor\log_2{N}\rfloor$}\label{prg:pseudoCR_vnejsi}
+	\STATE $R$ = každý druhý řádek z $R$
+	\FORALL{$radek$ in $R$} \label{prg:pseudoCR_vnitrni}
+		\STATE $dist$ = $2^{krok-1}$
+		\STATE proveď elementární úpravu řádku $radek$ v závislosti na $dist$
+	\ENDFOR
+\ENDFOR
+\STATE vyřeš rovnici představovanou posledním zbývajícím řádkem
+\FOR{$krok = \lfloor\log_2{N}\rfloor \to 1$}\label{prg:pseudoCR_vnejsi2}
+	\STATE $R$ = řádky odebrané v první fázi v kroku $krok$
+	\FORALL{$radek$ in $R$}\label{prg:pseudoCR_vnitrni2}
+		\STATE vypočítej neznámou v matici v řádku $radek$
+	\ENDFOR
+\ENDFOR
+\end{algorithmic}
+\end{algorithm}
+
+
+
 \chapter{Technologie CUDA}
 
 \chapter{Implementace řešení}
+
+\section{Nastavení Visual Studia}
+Pro implementaci a veškerý vývoj používám MS Visual Studio 2010. Nvidia podporuje toto vývojové prostředí a vytváří moduly pro psaní programů v CUDA.
+\pozn{vytvoření projektu, souborů .cpp, .cu, instalace CUDA kit...}
+Dále musíme projekt nastavit tak, aby dokázal zkompilovat kód v CUDA.
+
 
 Nyní se pustíme do samotné implementace algoritmů. Základní algoritmus pro řešení SLR je Gaussova eliminace, která převádí matici na horní stupňovitý tvar a poté na jednotkovou matici. My ale použijeme Gauss-Jordanovu eliminaci, která v každém kroku eliminuje podle jednoho řádku - pivotní řádek, a která v každém kroku vytvoří v jednom sloupci samé nuly kromě čísla na diagonále. Gauss-Jordanova eliminace má stejnou složitost \ref jako Gaussova eliminace a navíc se snadněji paralelizuje.
 
 \begin{figure}[h]
 \begin{center}
-\includegraphics[width=10cm]{images/GJM.png}
+% \includegraphics[width=10cm]{images/GJM.png}
 \caption{ Znázornění Gauss-Jordanovy metody }
 \label{obr:GJ_slozitost}
 \end{center}

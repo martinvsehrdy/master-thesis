@@ -64,6 +64,9 @@
 % line breaks in URL
 \def\UrlBreaks{\do\/\do\-}
 
+% cernym16: pridano
+\RequirePackage{color}
+
 % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
 % general commands
 % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
