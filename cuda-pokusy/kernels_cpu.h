@@ -6,6 +6,8 @@
 /* kernels.cpp */
 //template<class TYPE>
 int load_matrix(int* N, TYPE** matice, TYPE** prava_strana, char* filename);
+void gener_primes();
+void gener_inverse(int modul, int** inverse);
 void gauss_jordan_elim_for(int N, int modul, int* m_matice, int* m_prava_strana, int* m_vys_jmenovatel);
 void gauss_jordan_elim_while(int N, int modul, int* m_matice, int* m_prava_strana, int* m_vys_jmenovatel);
 void gauss_jordan_elim_part(int N, int modul, int* m_matice, int* m_prava_strana, int* m_vys_jmenovatel);

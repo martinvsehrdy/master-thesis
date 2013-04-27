@@ -48,7 +48,10 @@ int load_matrix(int* N, TYPE** matice, TYPE** prava_strana, char* filename)
 	*prava_strana=prava_strana1;
 	return 0;
 }
-
+/* 
+ * gauss-jordanova eliminace, jednovlaknova, ve for-cyklech, primo na datech ve vstupnim poli, 
+ * bez deleni - nasobim oba mergujici radky, po vypoctu kazde bunky se moduluje
+ */
 void gauss_jordan_elim_for(int N, int modul, int* m_matice, int* m_prava_strana, int* m_vys_jmenovatel)
 {
 	// TODO: posouvat cisla v radcich doleva, kvuli CUDA, aby se pristupovalo stale na ty stejna mista v pameti, 
@@ -119,7 +122,11 @@ void gauss_jordan_elim_for(int N, int modul, int* m_matice, int* m_prava_strana,
 		m_vys_jmenovatel[iX]=m_matice[get_index(iX, iX, N)];
 	}
 }
-
+/* 
+ * gauss-jordanova eliminace, jednovlaknova, ve while-cyklech, primo na datech ve vstupnim poli, 
+ * bez deleni - nasobim oba mergujici radky, po vypoctu kazde bunky se moduluje, 
+ * dva pristupy k matici: ipivot prochazi pres matici pres radky/sloupce
+ */
 void gauss_jordan_elim_while(int N, int modul, int* m_matice, int* m_prava_strana, int* m_vys_jmenovatel)
 {
 	// TODO: posouvat cisla v radcich doleva, kvuli CUDA, aby se pristupovalo stale na ty stejna mista v pameti, 
@@ -465,6 +472,37 @@ void gauss_jordan_elim_part(int N, int modul, int* m_matice, int* m_prava_strana
 	free(citatele);
 	free(diag_pivot);
 }
+/* inverse = [1;modul-1], size(inverse)=(modul-1)
+ * inverzni k cislu A je inverse[A-1]
+ */
+void gener_inverse(int modul, int** inverse)
+{
+	if((*inverse)!=NULL)
+	{
+		free((*inverse));
+		(*inverse)=NULL;
+	}
+	(*inverse)=(int*)malloc((modul-1)*sizeof(int));
+	for(int i=1;i<modul;i++)
+	{
+		(*inverse)[i-1]=0;
+	}
+	
+	for(int cislo=1;cislo<modul;cislo++)
+	{
+		if((*inverse)[cislo-1]==0)
+		{
+			int inv=0;
+			for(inv=1;inv<modul;inv++)
+			{
+				if( (cislo*inv)% modul==1 ) break;
+			}
+			(*inverse)[cislo-1]=inv;
+			(*inverse)[inv-1]=cislo;
+		}
+	}
+}
+
 
 int get_index(int X, int Y, int N)	// SLOUPEC, RADEK
 {
