@@ -475,31 +475,35 @@ void gauss_jordan_elim_part(int N, int modul, int* m_matice, int* m_prava_strana
 /* inverse = [1;modul-1], size(inverse)=(modul-1)
  * inverzni k cislu A je inverse[A-1]
  */
-void gener_inverse(int modul, int** inverse)
+void gener_inverse(int modul, int* inverse)
 {
-	if((*inverse)!=NULL)
+	int tid=0;
+	int bdim=1;	// blockDim.x;
+
+	int cislo=tid+1;
+	while(cislo<modul)
 	{
-		free((*inverse));
-		(*inverse)=NULL;
-	}
-	(*inverse)=(int*)malloc((modul-1)*sizeof(int));
-	for(int i=1;i<modul;i++)
-	{
-		(*inverse)[i-1]=0;
+		inverse[cislo-1]=0;
+		cislo+=bdim;
 	}
 	
-	for(int cislo=1;cislo<modul;cislo++)
+	cislo=tid+1;
+	while(cislo<modul)
 	{
-		if((*inverse)[cislo-1]==0)
+		if(inverse[cislo-1]==0)
 		{
 			int inv=0;
 			for(inv=1;inv<modul;inv++)
 			{
-				if( (cislo*inv)% modul==1 ) break;
+				if( (cislo*inv)% modul==1 )
+				{
+					inverse[cislo-1]=inv;
+					inverse[inv-1]=cislo;
+					break;
+				}
 			}
-			(*inverse)[cislo-1]=inv;
-			(*inverse)[inv-1]=cislo;
 		}
+		cislo+=bdim;
 	}
 }
 

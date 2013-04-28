@@ -63,6 +63,16 @@ int main(int argc, char** argv)
 {
 	int N;
 	int modul;
+
+
+	modul=7;
+	int* in=(int*)malloc((modul-1)*sizeof(int));
+	gener_inverse(modul, in);
+	for(int i=1;i<modul;i++) cout << i << " - " << in[i-1] << endl;
+	cin.get();
+	return 0;
+
+
 	if(argc>2)
 	{
 		N=atoi(argv[1]);
