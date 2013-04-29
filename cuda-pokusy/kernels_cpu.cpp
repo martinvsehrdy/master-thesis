@@ -231,7 +231,7 @@ void gauss_jordan_elim_while(int N, int modul, int* m_matice, int* m_prava_stran
 			m_prava_strana[iY]=pom % modul;
 			//if(m_prava_strana[iY]<0) m_prava_strana[iY]+=modul;
 		}//*/
-		vypsat_mat(N, m_matice, m_prava_strana);
+		vypsat_mat(N, N, m_matice, m_prava_strana);
 	}
 	// ulozit diagonalu do m_vys_jmenovatel
 	itid=tid;
@@ -242,7 +242,7 @@ void gauss_jordan_elim_while(int N, int modul, int* m_matice, int* m_prava_stran
 	}
 }
 
-void gauss_jordan_elim_p1(int modul, int nx, int ny, int* s_matice, int* actions, int* diag_pivot, int zpusob_zprac)
+void gauss_jordan_elim_p1(int modul, int nx, int ny, int sx, int sy, int* s_matice, int* actions, int* diag_pivot, int zpusob_zprac)
 /* N, modul - stejne jako v gauss_jordan_elim_..
  * n - velikost s_matice
  * s_matice - pole shared, submatice
@@ -263,7 +263,7 @@ void gauss_jordan_elim_p1(int modul, int nx, int ny, int* s_matice, int* actions
 		if(zpusob_zprac<=2)
 		{
 			// deleni nulou => nasobeni inverznim prvkem
-			if(s_matice[get_index(ipivot, ipivot, nx)]==0)
+			if(zpusob_zprac==1 && s_matice[get_index(ipivot, ipivot, nx)]==0)
 			{
 				// v 'ipivot'-tem radku na diagonále je nula => vymena s jinym radkem
 				int novy_pivot=ipivot;
@@ -287,7 +287,8 @@ void gauss_jordan_elim_p1(int modul, int nx, int ny, int* s_matice, int* actions
 				}
 			}else
 			{
-				actions[ipivot]=ipivot;
+				//  pivotni prvek neni "0" (zpusob_zprac==1) nebo mi tam nula nevadi (zpusob_zprac==2)
+				actions[ipivot]=ipivot;	// "vymenit" sam se sebou
 			}
 		}
 
@@ -306,49 +307,53 @@ void gauss_jordan_elim_p1(int modul, int nx, int ny, int* s_matice, int* actions
 		}
 
 		int multipl1;
+		int multipl2;
 		itid=tid;
-		while(itid<ny)	// prochazi jednotlive radky
+		while(itid<sy)	// prochazi jednotlive radky
 		{
 			int iact=ny+2*(itid+ny*ipivot);
-			if(zpusob_zprac==1 && itid==ipivot)
+			switch(zpusob_zprac)
 			{
-				actions[iact]=1;
-				actions[iact+1]=0;
-				itid+=1;
-				continue;
-			}
-			int multipl2;
-			if(zpusob_zprac==1)	// supmatice je na dianogale
-			{
-				multipl1=s_matice[get_index(ipivot, ipivot, nx)];
-				actions[iact]=multipl1;
-				multipl2=s_matice[get_index(ipivot, itid, nx)];
-				actions[iact+1]=multipl2;
-				cout << multipl1 << "(" << (iact) << ")," << multipl2 << "(" << (iact+1) << ") | ";
-			}else
-			if(zpusob_zprac==2)
-			{
+			case 1:	// supmatice je na dianogale
+				if(itid==ipivot)	// prvek je na diagonale ve velke matici
+				{
+					actions[iact]=1;
+					actions[iact+1]=0;
+				}else
+				{
+					multipl1=s_matice[get_index(ipivot, ipivot, nx)];
+					actions[iact]=multipl1;
+					multipl2=s_matice[get_index(ipivot, itid, nx)];
+					actions[iact+1]=multipl2;
+				}
+				cout << actions[iact] << "(" << (iact) << ")," << actions[iact+1] << "(" << (iact+1) << ") | ";
+				break;
+			case 2:
 				multipl1=diag_pivot[ipivot];
 				actions[iact]=multipl1;
 				multipl2=s_matice[get_index(ipivot, itid, nx)];
 				actions[iact+1]=multipl2;
-				cout << multipl1 << "(" << (iact) << ")," << multipl2 << "(" << (iact+1) << ") | ";
-			}else
-			{
+				cout << actions[iact] << "(" << (iact) << ")," << actions[iact+1] << "(" << (iact+1) << ") | ";
+				break;
+			case 3:
 				multipl1=actions[iact];
 				multipl2=actions[iact+1];
+				break;
 			}
-			long long pom;
-			for(int iX=0;iX<nx;iX++)	// prochazi cisla v i1-tem radku
+			if(actions[iact]!=1 || actions[iact+1]!=0)	// jinak upravuju radek a sloupec, ktery se protina na diagonale -> ten prvek je pivot - neupravuje se
 			{
-				// TODO: atomicOperators
-				long long m1=(long long)s_matice[get_index(iX, itid, nx)];
-				long long m2;
-				if(zpusob_zprac==2) m2=(long long)(iX==ipivot ? diag_pivot[iX] : 0);
-				else m2=(long long)s_matice[get_index(iX, ipivot, nx)];
-				pom = multipl1*m1-multipl2*m2;
-				pom=pom % modul;
-				s_matice[get_index(iX, itid, nx)]=(int)pom;
+				long long pom;
+				for(int iX=0;iX<sx;iX++)	// prochazi cisla v i1-tem radku
+				{
+					// TODO: atomicOperators
+					long long m1=(long long)s_matice[get_index(iX, itid, nx)];
+					long long m2;
+					if(zpusob_zprac==2) m2=(long long)(iX==ipivot ? diag_pivot[iX] : 0);
+					else m2=(long long)s_matice[get_index(iX, ipivot, nx)];
+					pom = multipl1*m1-multipl2*m2;
+					//pom=pom % modul;
+					s_matice[get_index(iX, itid, nx)]=(int)pom;
+				}
 			}
 			itid+=1;
 		}
@@ -381,38 +386,34 @@ void gauss_jordan_elim_part(int N, int modul, int* m_matice, int* m_prava_strana
 			else zpusob_zpracovani=3;	// tupe upravovani podle action
 
 			px=0;
-			while(px<nx)
+			int nx1=min(N-sx*nx+1, nx);	// aktualni x-velikost submatice; +1 kvuli prave strane
+			int ny1=min(N-sy*ny, ny);	// aktualni y-velikost submatice
+			while(px<nx1)
 			{
-				int x1=sx*nx+px;
-				if(x1<=N)
+				int x1=sx*nx+px;	// x-index ve velke matici prvku, ktery prijde do submatice
+				for(py=0;py<ny1;py++)
 				{
-					for(py=0;py<ny;py++)
+					int y1=sy*ny+py;	// y-index ve velke matici prvku, ktery prijde do submatice
+					if(x1==N)
 					{
-						int y1=sy*ny+py;
-						if(y1 < N)
-						{
-							if(x1==N)
-							{
-								sub_m[get_index(px, py, nx)] = m_prava_strana[y1];
-								// DEBUG
-								//m_prava_strana[y1]=zpusob_zpracovani;
+						sub_m[get_index(px, py, nx)] = m_prava_strana[y1];
+						// DEBUG
+						//m_prava_strana[y1]=zpusob_zpracovani;
 
-							}else
-							{
-								sub_m[get_index(px, py, nx)] = m_matice[get_index(x1, y1, N)];
-								// DEBUG
-								//m_matice[get_index(x1, y1, N)]=zpusob_zpracovani;
-							}
-						}
+					}else
+					{
+						sub_m[get_index(px, py, nx)] = m_matice[get_index(x1, y1, N)];
+						// DEBUG
+						//m_matice[get_index(x1, y1, N)]=zpusob_zpracovani;
 					}
 				}
 				if(x1<N) diag_pivot[px] = m_matice[get_index(x1, x1, N)];
 
 				px++;
 			}
-
+			vypsat_mat(nx, ny, sub_m, NULL);
 			// spusti .._p1
-			gauss_jordan_elim_p1(modul, nx, ny, sub_m, citatele, diag_pivot, zpusob_zpracovani);
+			gauss_jordan_elim_p1(modul, nx, ny, nx1, ny1, sub_m, citatele, diag_pivot, zpusob_zpracovani);
 			
 			// zpetne nahravani do matice
 			px=0;
@@ -460,7 +461,7 @@ void gauss_jordan_elim_part(int N, int modul, int* m_matice, int* m_prava_strana
 				else cout << ",";
 			}
 			cout << endl;
-			vypsat_mat(N, m_matice, m_prava_strana);
+			vypsat_mat(N, N, m_matice, m_prava_strana);
 
 
 		}
@@ -513,41 +514,41 @@ int get_index(int X, int Y, int N)	// SLOUPEC, RADEK
 	return X*N+Y;
 }
 
-void vypsat_mat(int N, TYPE* matice, TYPE* prava_strana)
+void vypsat_mat(int nx, int ny, TYPE* matice, TYPE* prava_strana)
 {
 	cout << endl;
-	for(int y=0;y<min(N,12);y++)
+	for(int y=0;y<min(ny,12);y++)
 	{
 		int x;
-		for(x=0;x<min(N,10);x++)
+		for(x=0;x<min(nx,10);x++)
 		{
 			cout.precision(5);
-			cout << matice[get_index(x, y, N)] << "\t";
+			cout << matice[get_index(x, y, max(nx, ny))] << "\t";
 		}
-		if(x<N-1) cout << "...";
+		if(x<nx-1) cout << "...";
 		cout << "| ";
 		if(prava_strana!=NULL) cout << prava_strana[y];
 		cout << endl;
 	}
 }
-void vypsat_matlab(int N, TYPE* matice, TYPE* prava_strana)
+void vypsat_matlab(int nx, int ny, TYPE* matice, TYPE* prava_strana)
 {
 	cout << endl << "A=[";
-	for(int y=0;y<N;y++)
+	for(int y=0;y<ny;y++)
 	{
 		int x;
-		for(x=0;x<N;x++)
+		for(x=0;x<nx;x++)
 		{
-			cout << matice[get_index(x, y, N)];
-			if(x<N-1) cout << ",";
+			cout << matice[get_index(x, y, max(nx, ny))];
+			if(x<nx-1) cout << ",";
 		}
-		if(y<N-1) cout << ";";
+		if(y<ny-1) cout << ";";
 	}
 	cout << "];" << endl << "b=[";
-	for(int y=0;y<N;y++)
+	for(int y=0;y<ny;y++)
 	{
 		cout << prava_strana[y];
-		if(y<N-1) cout << ";";
+		if(y<ny-1) cout << ";";
 	}
 	cout << "];" << endl;
 }

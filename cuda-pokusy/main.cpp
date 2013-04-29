@@ -31,7 +31,7 @@ void statistic(list<float> l, float* quartal1, float* quartal2, float* quartal3,
 		l.pop_front();
 	}
 	if(poc>0) *avg/=poc;
-	if(l1.size()>0 && l2.size()>0) *quartal2=(l1.back() + l2.front())/2.0;
+	if(l1.size()>0 && l2.size()>0) *quartal2=(float)((l1.back() + l2.front())/2.0);
 	else *quartal2=0;
 	while(l1.size()>2 && l2.size()>2)
 	{
@@ -64,13 +64,13 @@ int main(int argc, char** argv)
 	int N;
 	int modul;
 
-
+	/*
 	modul=7;
 	int* in=(int*)malloc((modul-1)*sizeof(int));
 	gener_inverse(modul, in);
 	for(int i=1;i<modul;i++) cout << i << " - " << in[i-1] << endl;
 	cin.get();
-	return 0;
+	return 0;//*/
 
 
 	if(argc>2)
@@ -87,13 +87,13 @@ int main(int argc, char** argv)
 	int* b=new int[N];
 	int* jm=new int[N];
 	load_matrix(&N, &A, &b, "../diplomka/mat-int.txt");
-	vypsat_mat(N, A, b);
+	vypsat_mat(N, N, A, b);
 	gauss_jordan_elim_while(N, modul, A, b, jm);
 
 
 	cout << endl << "-------------------------------" << endl;
 	load_matrix(&N, &A, &b, "../diplomka/mat-int.txt");
-	vypsat_mat(N, A, b);
+	vypsat_mat(N, N, A, b);
 	gauss_jordan_elim_part(N, modul, A, b, jm);
 
 #ifdef _DEBUG
