@@ -62,17 +62,37 @@ void statistic(list<float> l, float* quartal1, float* quartal2, float* quartal3,
 int main(int argc, char** argv)
 // argv[0] <N> <modul>
 {
-	int N;
-	int modul;
+	int N=17;
+	int modul=0;
+	unsigned int* V=new unsigned int[N*N];
+	unsigned int* M=new unsigned int[N];
 
-	/*
-	modul=7;
-	int* in=(int*)malloc((modul-1)*sizeof(int));
-	gener_inverse(modul, in);
-	for(int i=1;i<modul;i++) cout << i << " - " << in[i-1] << endl;
+	GJE_podmatice(N, modul, V, M, NULL);
+	/*unsigned int* V=new unsigned int[N*N];
+	unsigned int* M=new unsigned int[Sx*Sy];
+	for(int i=0;i<N*N;i++) V[i]=100;
+	for(int y=0;y<ceil((double)N/Sy);y++)
+	{
+		for(int x=0;x<ceil((double)N/Sx);x++)
+		{
+			for(int i=0;i<Sx*Sy;i++) M[i]=i;
+			copy_podmatice(N, x, y, Sx, Sy, M, V, COPY_TO_GLOBAL_MEM);
+		}
+	}
+
+	for(int y=0;y<N;y++)
+	{
+		for(int x=0;x<N;x++)
+		{
+			printf("%4u", V[get_index(x, y, N)]);
+		}
+		printf("\n");
+	} //*/
 	cin.get();
+	free(V);
+	free(M);
 	return 0;//*/
-
+	////////////////////////////////////////////////////////
 
 	if(argc>2)
 	{

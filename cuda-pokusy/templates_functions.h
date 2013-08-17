@@ -54,7 +54,7 @@ void vypsat_mat(int nx, int ny, TYPE* matice, TYPE* prava_strana)
 	for(int y=0;y<min(ny,12);y++)
 	{
 		int x;
-		for(x=0;x<min(nx,10);x++)
+		for(x=0;x<min(nx,8);x++)
 		{
 			cout.precision(5);
 			cout << matice[get_index(x, y, max(nx, ny))] << "\t";

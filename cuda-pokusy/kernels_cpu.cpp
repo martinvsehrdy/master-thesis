@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "kernels_cpu.h"
 #include "templates_functions.h"
+#include <cstdio>
 
 using namespace std;
 
@@ -424,34 +425,112 @@ void gauss_jordan_elim_part(int N, unsigned int modul, unsigned int* m_matice, u
 
 		}
 	}
-
-
-
 	free(sub_m);
 	free(citatele);
 	free(diag_pivot);
 }
+
+/* nacte/ulozi podmatici z globalni p. do sdilene nebo zpet
+ * sx, sy - souradnice zvolene podmatice v matici, sx \in [0; ceil(N/Sx)]
+ * mat_source, mat_dest - zdrojova resp. cilova adresa
+ */
+//#define COPY_TO_SHARED_MEM	1
+//#define COPY_TO_GLOBAL_MEM	2
+void copy_podmatice(int N, int sx, int sy, int Sx, int Sy, unsigned int* mat_source, unsigned int* mat_dest, int copy_to)
+{
+	int tid=0;
+	int bdim=1;
+	int itid=tid;
+	while(itid<Sy)
+	{
+		for(int ix=0;ix<Sx;ix++)
+		{
+			int glob_x=sx*Sx+ix;
+			int glob_y=sy*Sy+itid;
+			if(glob_x<N && glob_y<N)
+			{
+				switch(copy_to)
+				{
+				case COPY_TO_GLOBAL_MEM:
+					mat_dest[get_index(glob_x, glob_y, N)] = mat_source[get_index(ix, itid, Sx)];
+					break;
+				case COPY_TO_SHARED_MEM:
+					mat_dest[get_index(ix, itid, Sx)] = mat_source[get_index(glob_x, glob_y, N)];
+					break;
+				}
+			}
+		}
+		itid+=bdim;
+	}
+}
+
+void compute_podmatice1(int N, int Sx, int Sy, unsigned int* s_mat, unsigned int* actions)
+{
+	
+}
+
 /* celou matici rozdelim do obdelnikovych "podmatic", ktere budu postupne nahravat do sdilene pameti a pocitat
  * podmatice nemusi byt nutne ctvercova
  * zpusob zpracovani: 1, 2, 3, 4
  */
 void GJE_podmatice(int N, unsigned int modul, unsigned int* m_matice, unsigned int* m_prava_strana, unsigned int* m_vys_jmenovatel)
 {
+	int Sx=3;
+	int Sy=3;
+	unsigned int* s_matice=(unsigned int*)malloc(Sx*Sy*sizeof(unsigned int));
+	unsigned int* actions=(unsigned int*)malloc(sizeof(unsigned int));
+	int Smin=min(Sx, Sy);
+	
 // \FOR{$p$ := $1$ do $\lceil\frac{N}{\min(S_x, S_y)}\rceil$}
+	for(int ipivot=0;ipivot<=ceil((double)N/Smin);ipivot++)
+	{
+		// DEBUG
+		cout << endl << ipivot << endl;
 	// \STATE \COMMENT{zpracovani radku, kde je Z=1}
 	// \STATE nacist a spocitat $podmatice_{pp}$ \COMMENT{Z=1}
+		copy_podmatice(N, ipivot, ipivot, Sx, Sy, m_matice, s_matice, COPY_TO_SHARED_MEM);
+		// todo: compute_podmatice1
+		for(int i=0;i<Sx*Sy;i++) s_matice[i]=1;
+		copy_podmatice(N, ipivot, ipivot, Sx, Sy, s_matice, m_matice, COPY_TO_GLOBAL_MEM);
 	// \FOR{$x$ := $p+1$ do $\lceil\frac{N+1}{S_x}\rceil$}
+		for(int x=ipivot+1;x<=ceil((double)(N+1)/Sx);x++)
+		{
 		// \STATE nacist a aplikovat operace v $actions$ na $podmatice_{xp}$ \COMMENT{Z=2}
+			copy_podmatice(N, x, ipivot, Sx, Sy, m_matice, s_matice, COPY_TO_SHARED_MEM);
+			// todo: compute_podmatice2
+			for(int i=0;i<Sx*Sy;i++) s_matice[i]=2;
+			copy_podmatice(N, x, ipivot, Sx, Sy, s_matice, m_matice, COPY_TO_GLOBAL_MEM);
+		}
 	//\ENDFOR
 	// \STATE \COMMENT{zpracovani ostatnich radku}
 	// \FOR{$y$ := $1$ do $\lceil\frac{N}{S_y}\rceil$}
+		for(int y=0;y<=ceil((double)N/Sy);y++)
+		{
 		// \IF{$y$ != $p$}
+			if(y!=ipivot)
+			{
 			// \STATE nacist a vynulovat $podmatice_{py}$; \COMMENT{Z=3}
+				copy_podmatice(N, ipivot, y, Sx, Sy, m_matice, s_matice, COPY_TO_SHARED_MEM);
+				// todo: compute_podmatice3
+				for(int i=0;i<Sx*Sy;i++) s_matice[i]=3;
+				copy_podmatice(N, ipivot, y, Sx, Sy, s_matice, m_matice, COPY_TO_GLOBAL_MEM);
 			// \FOR{$x$ := $p+1$ do $\lceil\frac{N+1}{S_x}\rceil$}
+				for(int x=ipivot+1;x<ceil((double)(N+1)/Sx);x++)
+				{
 				// \STATE nacist a aplikovat operace v $actions$ na $podmatice_{xy}$; \COMMENT{Z=4}
+					copy_podmatice(N, x, y, Sx, Sy, m_matice, s_matice, COPY_TO_SHARED_MEM);
+					// todo: compute_podmatice4
+					for(int i=0;i<Sx*Sy;i++) s_matice[i]=4;
+					copy_podmatice(N, x, y, Sx, Sy, s_matice, m_matice, COPY_TO_GLOBAL_MEM);
+				}
 			// \ENDFOR
+			}
 		// \ENDIF
+		}
+		// DEBUG
+		vypsat_mat<unsigned int>(N, N, m_matice, m_prava_strana);
 	//\ENDFOR
+	}
 //\ENDFOR
 }
 
@@ -499,5 +578,5 @@ unsigned int get_inverse(unsigned int prvek, unsigned int* arr_inverse)
 
 int get_index(int X, int Y, int N)	// SLOUPEC, RADEK
 {
-	return X*N+Y;
+	return Y*N+X;
 }
