@@ -431,6 +431,30 @@ void gauss_jordan_elim_part(int N, unsigned int modul, unsigned int* m_matice, u
 	free(citatele);
 	free(diag_pivot);
 }
+/* celou matici rozdelim do obdelnikovych "podmatic", ktere budu postupne nahravat do sdilene pameti a pocitat
+ * podmatice nemusi byt nutne ctvercova
+ * zpusob zpracovani: 1, 2, 3, 4
+ */
+void GJE_podmatice(int N, unsigned int modul, unsigned int* m_matice, unsigned int* m_prava_strana, unsigned int* m_vys_jmenovatel)
+{
+// \FOR{$p$ := $1$ do $\lceil\frac{N}{\min(S_x, S_y)}\rceil$}
+	// \STATE \COMMENT{zpracovani radku, kde je Z=1}
+	// \STATE nacist a spocitat $podmatice_{pp}$ \COMMENT{Z=1}
+	// \FOR{$x$ := $p+1$ do $\lceil\frac{N+1}{S_x}\rceil$}
+		// \STATE nacist a aplikovat operace v $actions$ na $podmatice_{xp}$ \COMMENT{Z=2}
+	//\ENDFOR
+	// \STATE \COMMENT{zpracovani ostatnich radku}
+	// \FOR{$y$ := $1$ do $\lceil\frac{N}{S_y}\rceil$}
+		// \IF{$y$ != $p$}
+			// \STATE nacist a vynulovat $podmatice_{py}$; \COMMENT{Z=3}
+			// \FOR{$x$ := $p+1$ do $\lceil\frac{N+1}{S_x}\rceil$}
+				// \STATE nacist a aplikovat operace v $actions$ na $podmatice_{xy}$; \COMMENT{Z=4}
+			// \ENDFOR
+		// \ENDIF
+	//\ENDFOR
+//\ENDFOR
+}
+
 /* inverse = [1;modul-1], size(inverse)=(modul-1)
  * inverzni k cislu A je inverse[A-1]
  */
