@@ -4,6 +4,7 @@
 #include <iostream>
 #include <list>
 #include "kernels_cpu.h"
+#include "templates_functions.h"
 
 using namespace std;
 
@@ -83,11 +84,11 @@ int main(int argc, char** argv)
 		cout << "#Vystup: <velikost N> <na GPU [ms]>\t<z GPU [ms]>\tprumer\tnejrychlejsi\t1.quartal\tmedian\t3.quartal\tnejpomalejsi\t<celkem [ms]>" << endl;
 		return 0;
 	}
-	int* A=new int[N*N];
-	int* b=new int[N];
-	int* jm=new int[N];
-	load_matrix(&N, &A, &b, "../diplomka/mat-int.txt");
-	vypsat_mat(N, N, A, b);
+	unsigned int* A=new unsigned int[N*N];
+	unsigned int* b=new unsigned int[N];
+	unsigned int* jm=new unsigned int[N];
+	load_matrix<unsigned int>(&N, &A, &b, "../diplomka/mat-int.txt");
+	vypsat_mat<unsigned int>(N, N, A, b);
 	gauss_jordan_elim_while(N, modul, A, b, jm);
 
 
@@ -97,7 +98,7 @@ int main(int argc, char** argv)
 	gauss_jordan_elim_part(N, modul, A, b, jm);
 
 #ifdef _DEBUG
-	vypsat_vys(N, b, jm);
+	vypsat_vys<unsigned int>(N, b, jm);
 	cin.get();
 #else
 	delete[] A;

@@ -30,6 +30,9 @@
     <ClInclude Include="kernels_cpu.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="templates_functions.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">

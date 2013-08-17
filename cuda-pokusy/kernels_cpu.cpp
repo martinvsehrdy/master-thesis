@@ -1,53 +1,10 @@
 #include "stdafx.h"
-#include <iostream>
-#include <fstream>
 #include "kernels_cpu.h"
+#include "templates_functions.h"
 
 using namespace std;
 
-int get_index(int X, int Y, int N);
 
-//template<class TYPE>
-int load_matrix(int* N, TYPE** matice, TYPE** prava_strana, char* filename)
-{
-	TYPE* matice1=*matice;
-	TYPE* prava_strana1=*prava_strana;
-
-	fstream file;
-	file.open(filename, fstream::in);
-	if(!file.is_open()) return 1;
-	int newN=0;
-	file >> newN;
-	if(newN<=0) return 2;	// nekladna cisla nechci
-	
-	if((*N)!=newN)	// stara a nova matice maji ruznou velikost => musim zmenit velikost
-	{
-		(*N)=newN;
-		if(matice1!=NULL) delete matice1;
-		matice1=NULL;
-		if(prava_strana1!=NULL) delete prava_strana1;
-		prava_strana1=NULL;
-	}
-	if(matice1==NULL) matice1=new TYPE[(*N)*(*N)];
-	if(prava_strana1==NULL) prava_strana1=new TYPE[*N];
-	TYPE a;
-	for(int y=0;y<(*N);y++)
-	{
-		for(int x=0;x<(*N);x++)
-		{
-			if(!file.eof()) file >> a;
-			else a=(TYPE)0.0;
-			matice1[get_index(x, y, (*N))]=a;
-		}
-		if(!file.eof()) file >> a;
-		else a=(TYPE)0.0;
-		prava_strana1[y]=a;
-	}
-	file.close();
-	*matice=matice1;
-	*prava_strana=prava_strana1;
-	return 0;
-}
 /* 
  * gauss-jordanova eliminace, jednovlaknova, ve for-cyklech, primo na datech ve vstupnim poli, 
  * bez deleni - nasobim oba mergujici radky, po vypoctu kazde bunky se moduluje
@@ -127,7 +84,7 @@ void gauss_jordan_elim_for(int N, int modul, int* m_matice, int* m_prava_strana,
  * bez deleni - nasobim oba mergujici radky, po vypoctu kazde bunky se moduluje, 
  * dva pristupy k matici: ipivot prochazi pres matici pres radky/sloupce
  */
-void gauss_jordan_elim_while(int N, int modul, int* m_matice, int* m_prava_strana, int* m_vys_jmenovatel)
+void gauss_jordan_elim_while(int N, unsigned int modul, unsigned int* m_matice, unsigned int* m_prava_strana, unsigned int* m_vys_jmenovatel)
 {
 	// TODO: posouvat cisla v radcich doleva, kvuli CUDA, aby se pristupovalo stale na ty stejna mista v pameti, 
 	//       vysledek bude v prvnim sloupci matice
@@ -242,11 +199,12 @@ void gauss_jordan_elim_while(int N, int modul, int* m_matice, int* m_prava_stran
 	}
 }
 
-void gauss_jordan_elim_p1(int modul, int nx, int ny, int sx, int sy, int* s_matice, int* actions, int* diag_pivot, int zpusob_zprac)
+void gauss_jordan_elim_p1(int modul, int nx, int ny, int sx, int sy, unsigned int* s_matice, unsigned int* actions, unsigned int* diag_pivot, int zpusob_zprac)
 /* N, modul - stejne jako v gauss_jordan_elim_..
  * n - velikost s_matice
  * s_matice - pole shared, submatice
- * actions - ny cisel (indexu) radku kvuli vymene radku s nulovym cislem na diagonale, nasleduje pole dvojic cisel, kteryma nasobim radek a pivota
+ * actions - ny cisel (indexu) radku, kvuli vymene radku s nulovym cislem na diagonale
+             nasleduje pole dvojic cisel, kteryma nasobim radek a pivota
  * diag_pivot - diagonala ze submatice lezici na diagonale matice (sx==sy), predstavuje pivotni radky
  * zpusob_zprac - co s tou submatici delam
  *	1 - na diagonale, generuju actions
@@ -360,7 +318,7 @@ void gauss_jordan_elim_p1(int modul, int nx, int ny, int sx, int sy, int* s_mati
 	}
 }
 
-void gauss_jordan_elim_part(int N, int modul, int* m_matice, int* m_prava_strana, int* m_vys_jmenovatel)
+void gauss_jordan_elim_part(int N, unsigned int modul, unsigned int* m_matice, unsigned int* m_prava_strana, unsigned int* m_vys_jmenovatel)
 {
 	// nahraje submatici do shared
 	int nx, ny;	// velikost submatice
@@ -368,9 +326,9 @@ void gauss_jordan_elim_part(int N, int modul, int* m_matice, int* m_prava_strana
 	int sx, sy;	// indexy urcujici submatici ve velke matici
 	int px, py;	// indexy urcujici pozici prvku v submatici
 	// __shared__
-	int* sub_m=(int*)malloc(nx*ny*sizeof(int));
-	int* citatele=(int*)malloc((2*ny*ny+ny)*sizeof(int));
-	int* diag_pivot=(int*)malloc(nx*sizeof(int));
+	unsigned int* sub_m=(unsigned int*)malloc(nx*ny*sizeof(unsigned int));
+	unsigned int* citatele=(unsigned int*)malloc((2*ny*ny+ny)*sizeof(unsigned int));
+	unsigned int* diag_pivot=(unsigned int*)malloc(nx*sizeof(unsigned int));
 
 	for(int sdiag=0;sdiag*nx<N;sdiag++)
 	for(int sy1=-1;sy1*ny<N;sy1++)
@@ -411,7 +369,7 @@ void gauss_jordan_elim_part(int N, int modul, int* m_matice, int* m_prava_strana
 
 				px++;
 			}
-			vypsat_mat(nx, ny, sub_m, NULL);
+			vypsat_mat<unsigned int>(nx, ny, sub_m, NULL);
 			// spusti .._p1
 			gauss_jordan_elim_p1(modul, nx, ny, nx1, ny1, sub_m, citatele, diag_pivot, zpusob_zpracovani);
 			
@@ -476,91 +434,46 @@ void gauss_jordan_elim_part(int N, int modul, int* m_matice, int* m_prava_strana
 /* inverse = [1;modul-1], size(inverse)=(modul-1)
  * inverzni k cislu A je inverse[A-1]
  */
-void gener_inverse(int modul, int* inverse)
+void gener_inverse(unsigned int modul, unsigned int* inverse)
 {
-	int tid=0;
+	unsigned int tid=(unsigned int)0;
 	int bdim=1;	// blockDim.x;
 
-	int cislo=tid+1;
+	unsigned int cislo=tid;
 	while(cislo<modul)
 	{
-		inverse[cislo-1]=0;
+		inverse[cislo]=0;
 		cislo+=bdim;
 	}
 	
 	cislo=tid+1;
 	while(cislo<modul)
 	{
-		if(inverse[cislo-1]==0)
+		if(inverse[cislo]==0)
 		{
-			int inv=0;
-			for(inv=1;inv<modul;inv++)
+			// todo: promenna "soucin", ke ktere by se pricitalo
+			unsigned int inv=1;
+			while(inv<modul)
 			{
 				if( (cislo*inv)% modul==1 )
 				{
-					inverse[cislo-1]=inv;
-					inverse[inv-1]=cislo;
+					inverse[cislo]=inv;
+					inverse[inv]=cislo;
 					break;
 				}
+				inv++;
 			}
 		}
 		cislo+=bdim;
 	}
 }
-
+unsigned int get_inverse(unsigned int prvek, unsigned int* arr_inverse)
+{
+	if(arr_inverse==NULL) return 0;
+	return arr_inverse[prvek];
+}
 
 int get_index(int X, int Y, int N)	// SLOUPEC, RADEK
 {
 	return X*N+Y;
-}
-
-void vypsat_mat(int nx, int ny, TYPE* matice, TYPE* prava_strana)
-{
-	cout << endl;
-	for(int y=0;y<min(ny,12);y++)
-	{
-		int x;
-		for(x=0;x<min(nx,10);x++)
-		{
-			cout.precision(5);
-			cout << matice[get_index(x, y, max(nx, ny))] << "\t";
-		}
-		if(x<nx-1) cout << "...";
-		cout << "| ";
-		if(prava_strana!=NULL) cout << prava_strana[y];
-		cout << endl;
-	}
-}
-void vypsat_matlab(int nx, int ny, TYPE* matice, TYPE* prava_strana)
-{
-	cout << endl << "A=[";
-	for(int y=0;y<ny;y++)
-	{
-		int x;
-		for(x=0;x<nx;x++)
-		{
-			cout << matice[get_index(x, y, max(nx, ny))];
-			if(x<nx-1) cout << ",";
-		}
-		if(y<ny-1) cout << ";";
-	}
-	cout << "];" << endl << "b=[";
-	for(int y=0;y<ny;y++)
-	{
-		cout << prava_strana[y];
-		if(y<ny-1) cout << ";";
-	}
-	cout << "];" << endl;
-}
-
-void vypsat_vys(int N, TYPE* citatel, TYPE* jmenovatel)
-{
-	cout << endl;
-	//cout.precision(7);
-	int i;
-	for(i=0;i<min(N,30);i++)
-	{
-		cout << citatel[i] << "/" << jmenovatel[i] << "\t";
-	}
-	if(i<N-1) cout << "...";
 }
