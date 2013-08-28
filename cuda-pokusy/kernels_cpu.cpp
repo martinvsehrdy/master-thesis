@@ -431,12 +431,13 @@ void gauss_jordan_elim_part(int N, unsigned int modul, unsigned int* m_matice, u
 }
 
 /* nacte/ulozi podmatici z globalni p. do sdilene nebo zpet
+ * Sx, Sy - velikost podmatice, mela by se vejit do sdilene pameti
  * sx, sy - souradnice zvolene podmatice v matici, sx \in [0; ceil(N/Sx)]
  * mat_source, mat_dest - zdrojova resp. cilova adresa
  */
 //#define COPY_TO_SHARED_MEM	1
 //#define COPY_TO_GLOBAL_MEM	2
-void copy_podmatice(int N, int sx, int sy, int Sx, int Sy, unsigned int* mat_source, unsigned int* mat_dest, int copy_to)
+void copy_podmatice(int N, int sx, int sy, int Sx, int Sy, unsigned int* mat_shared, unsigned int* mat_global, unsigned int* prava_str, int copy_to)
 {
 	int tid=0;
 	int bdim=1;
@@ -447,21 +448,40 @@ void copy_podmatice(int N, int sx, int sy, int Sx, int Sy, unsigned int* mat_sou
 		{
 			int glob_x=sx*Sx+ix;
 			int glob_y=sy*Sy+itid;
-			if(glob_x<N && glob_y<N)
+			if(glob_x<=N && glob_y<N)
 			{
-				switch(copy_to)
+				if(glob_x<N)
 				{
-				case COPY_TO_GLOBAL_MEM:
-					mat_dest[get_index(glob_x, glob_y, N)] = mat_source[get_index(ix, itid, Sx)];
-					break;
-				case COPY_TO_SHARED_MEM:
-					mat_dest[get_index(ix, itid, Sx)] = mat_source[get_index(glob_x, glob_y, N)];
-					break;
+					switch(copy_to)
+					{
+					case COPY_TO_GLOBAL_MEM:
+						mat_global[get_index(glob_x, glob_y, N)] = mat_shared[get_index(ix, itid, Sx)];
+						break;
+					case COPY_TO_SHARED_MEM:
+						mat_shared[get_index(ix, itid, Sx)] = mat_global[get_index(glob_x, glob_y, N)];
+						break;
+					}
+				}else
+				{
+					switch(copy_to)
+					{
+					case COPY_TO_GLOBAL_MEM:
+						prava_str[glob_y] = mat_shared[get_index(ix, itid, Sx)];
+						break;
+					case COPY_TO_SHARED_MEM:
+						mat_shared[get_index(ix, itid, Sx)] = prava_str[glob_y];
+						break;
+					}
 				}
+			}else
+			{
+				if(copy_to == COPY_TO_SHARED_MEM) mat_shared[get_index(ix, itid, Sx)] = 0;
 			}
 		}
 		itid+=bdim;
 	}
+	if(copy_to == COPY_TO_GLOBAL_MEM)
+		vypsat_vys<unsigned int>(N, prava_str, NULL);
 }
 
 void compute_podmatice1(int N, int Sx, int Sy, unsigned int* s_mat, unsigned int* actions)
@@ -477,29 +497,34 @@ void GJE_podmatice(int N, unsigned int modul, unsigned int* m_matice, unsigned i
 {
 	int Sx=3;
 	int Sy=3;
-	unsigned int* s_matice=(unsigned int*)malloc(Sx*Sy*sizeof(unsigned int));
-	unsigned int* actions=(unsigned int*)malloc(sizeof(unsigned int));
 	int Smin=min(Sx, Sy);
-	
+	unsigned int* s_matice=(unsigned int*)malloc(Sx*Sy*sizeof(unsigned int));
+	unsigned int* actions=(unsigned int*)malloc((Sx*Sy+Smin)*sizeof(unsigned int));
+#ifdef DELENI
+	// todo: inicializace inverse, inverze vsech prvku zabere 2 až 4 GB pameti
+#else
+	// inverse := null
+#endif
+
 // \FOR{$p$ := $1$ do $\lceil\frac{N}{\min(S_x, S_y)}\rceil$}
-	for(int ipivot=0;ipivot<=ceil((double)N/Smin);ipivot++)
+	for(int ipivot=0;ipivot<ceil((double)N/Smin);ipivot++)
 	{
 		// DEBUG
 		cout << endl << ipivot << endl;
 	// \STATE \COMMENT{zpracovani radku, kde je Z=1}
 	// \STATE nacist a spocitat $podmatice_{pp}$ \COMMENT{Z=1}
-		copy_podmatice(N, ipivot, ipivot, Sx, Sy, m_matice, s_matice, COPY_TO_SHARED_MEM);
+		copy_podmatice(N, ipivot, ipivot, Sx, Sy, s_matice, m_matice, m_prava_strana, COPY_TO_SHARED_MEM);
 		// todo: compute_podmatice1
-		for(int i=0;i<Sx*Sy;i++) s_matice[i]=1;
-		copy_podmatice(N, ipivot, ipivot, Sx, Sy, s_matice, m_matice, COPY_TO_GLOBAL_MEM);
+		//for(int i=0;i<Sx*Sy;i++) s_matice[i]=1;
+		copy_podmatice(N, ipivot, ipivot, Sx, Sy, s_matice, m_matice, m_prava_strana, COPY_TO_GLOBAL_MEM);
 	// \FOR{$x$ := $p+1$ do $\lceil\frac{N+1}{S_x}\rceil$}
-		for(int x=ipivot+1;x<=ceil((double)(N+1)/Sx);x++)
+		for(int x=ipivot+1;x<ceil((double)(N+1)/Sx);x++)
 		{
 		// \STATE nacist a aplikovat operace v $actions$ na $podmatice_{xp}$ \COMMENT{Z=2}
-			copy_podmatice(N, x, ipivot, Sx, Sy, m_matice, s_matice, COPY_TO_SHARED_MEM);
+			copy_podmatice(N, x, ipivot, Sx, Sy, s_matice, m_matice, m_prava_strana, COPY_TO_SHARED_MEM);
 			// todo: compute_podmatice2
 			for(int i=0;i<Sx*Sy;i++) s_matice[i]=2;
-			copy_podmatice(N, x, ipivot, Sx, Sy, s_matice, m_matice, COPY_TO_GLOBAL_MEM);
+			copy_podmatice(N, x, ipivot, Sx, Sy, s_matice, m_matice, m_prava_strana, COPY_TO_GLOBAL_MEM);
 		}
 	//\ENDFOR
 	// \STATE \COMMENT{zpracovani ostatnich radku}
@@ -510,18 +535,18 @@ void GJE_podmatice(int N, unsigned int modul, unsigned int* m_matice, unsigned i
 			if(y!=ipivot)
 			{
 			// \STATE nacist a vynulovat $podmatice_{py}$; \COMMENT{Z=3}
-				copy_podmatice(N, ipivot, y, Sx, Sy, m_matice, s_matice, COPY_TO_SHARED_MEM);
+				copy_podmatice(N, ipivot, y, Sx, Sy, s_matice, m_matice, m_prava_strana, COPY_TO_SHARED_MEM);
 				// todo: compute_podmatice3
 				for(int i=0;i<Sx*Sy;i++) s_matice[i]=3;
-				copy_podmatice(N, ipivot, y, Sx, Sy, s_matice, m_matice, COPY_TO_GLOBAL_MEM);
+				copy_podmatice(N, ipivot, y, Sx, Sy, s_matice, m_matice, m_prava_strana, COPY_TO_GLOBAL_MEM);
 			// \FOR{$x$ := $p+1$ do $\lceil\frac{N+1}{S_x}\rceil$}
 				for(int x=ipivot+1;x<ceil((double)(N+1)/Sx);x++)
 				{
 				// \STATE nacist a aplikovat operace v $actions$ na $podmatice_{xy}$; \COMMENT{Z=4}
-					copy_podmatice(N, x, y, Sx, Sy, m_matice, s_matice, COPY_TO_SHARED_MEM);
+					copy_podmatice(N, x, y, Sx, Sy, s_matice, m_matice, m_prava_strana, COPY_TO_SHARED_MEM);
 					// todo: compute_podmatice4
 					for(int i=0;i<Sx*Sy;i++) s_matice[i]=4;
-					copy_podmatice(N, x, y, Sx, Sy, s_matice, m_matice, COPY_TO_GLOBAL_MEM);
+					copy_podmatice(N, x, y, Sx, Sy, s_matice, m_matice, m_prava_strana, COPY_TO_GLOBAL_MEM);
 				}
 			// \ENDFOR
 			}
@@ -534,6 +559,22 @@ void GJE_podmatice(int N, unsigned int modul, unsigned int* m_matice, unsigned i
 //\ENDFOR
 }
 
+unsigned int compute_inverse(unsigned int cislo, unsigned int modul)
+{
+	unsigned long long inv=cislo;
+	unsigned int i=1;
+	while(i<modul)
+	{
+		if( inv==1 )
+		{
+			return i;
+		}
+		inv+=cislo;
+		inv%=modul;
+		i++;
+	}
+	return (unsigned int)0;
+}
 /* inverse = [1;modul-1], size(inverse)=(modul-1)
  * inverzni k cislu A je inverse[A-1]
  */
@@ -554,18 +595,9 @@ void gener_inverse(unsigned int modul, unsigned int* inverse)
 	{
 		if(inverse[cislo]==0)
 		{
-			// todo: promenna "soucin", ke ktere by se pricitalo
-			unsigned int inv=1;
-			while(inv<modul)
-			{
-				if( (cislo*inv)% modul==1 )
-				{
-					inverse[cislo]=inv;
-					inverse[inv]=cislo;
-					break;
-				}
-				inv++;
-			}
+			unsigned int inv=compute_inverse(cislo, modul);
+			inverse[cislo]=inv;
+			inverse[inv]=cislo;
 		}
 		cislo+=bdim;
 	}

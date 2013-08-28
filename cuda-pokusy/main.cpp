@@ -62,7 +62,7 @@ void statistic(list<float> l, float* quartal1, float* quartal2, float* quartal3,
 int main(int argc, char** argv)
 // argv[0] <N> <modul>
 {
-	int N=17;
+	int N=4;
 	int modul=0;
 	unsigned int* V=new unsigned int[N*N];
 	unsigned int* M=new unsigned int[N];
@@ -115,7 +115,7 @@ int main(int argc, char** argv)
 	cout << endl << "-------------------------------" << endl;
 	load_matrix(&N, &A, &b, "../diplomka/mat-int.txt");
 	vypsat_mat(N, N, A, b);
-	gauss_jordan_elim_part(N, modul, A, b, jm);
+	GJE_podmatice(N, modul, A, b, jm);
 
 #ifdef _DEBUG
 	vypsat_vys<unsigned int>(N, b, jm);

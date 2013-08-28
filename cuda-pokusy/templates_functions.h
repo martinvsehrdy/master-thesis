@@ -97,7 +97,10 @@ void vypsat_vys(int N, TYPE* citatel, TYPE* jmenovatel)
 	int i;
 	for(i=0;i<min(N,30);i++)
 	{
-		cout << citatel[i] << "/" << jmenovatel[i] << "\t";
+		if(citatel!=NULL) cout << citatel[i];
+		cout << "/";
+		if(jmenovatel!=NULL) cout << jmenovatel[i];
+		cout << "\t";
 	}
 	if(i<N-1) cout << "...";
 }
