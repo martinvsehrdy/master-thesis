@@ -97,7 +97,6 @@ int main(int argc, char** argv)
 	unsigned int* jm=new unsigned int[N];
 	load_matrix<unsigned int>(&N, &A, &b, "../diplomka/mat-int.txt");
 	vypsat_mat<unsigned int>(N, N, A, b);
-	gauss_jordan_elim_while(N, modul, A, b, jm);
 
 
 	cout << endl << "-------------------------------" << endl;
