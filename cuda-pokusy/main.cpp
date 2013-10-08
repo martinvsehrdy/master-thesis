@@ -70,15 +70,25 @@ int main(int argc, char** argv)
 
 	load_matrix<unsigned int>(&N, &V, &M, "../diplomka/mat-int.txt");
 	vypsat_mat<unsigned int>(N, N, V, M);
-	GJE_podmatice(N, modul, V, M, NULL);
+	//GJE_podmatice(N, modul, V, M, NULL);
+	gauss_jordan_elim_for(N, modul, V, M, NULL);
 	vypsat_mat<unsigned int>(N, N, V, M);
 	
+	cout << "===================================================" << endl;
+	unsigned int* S=new unsigned int[N*N+N];
+	load_matrix<unsigned int>(&N, &V, &M, "../diplomka/mat-int.txt");
+	vypsat_mat<unsigned int>(N, N, V, M);
+	copy_podmatice(N, 0, 0, N+1, N, S, V, M, COPY_TO_SHARED_MEM);
+	gauss_jordan_elim_while(N+1, N, modul, S);
+	copy_podmatice(N, 0, 0, N+1, N, S, V, M, COPY_TO_GLOBAL_MEM);
+	vypsat_mat<unsigned int>(N, N, V, M);
 	
 #ifdef _DEBUG
 	cin.get();
 #endif
 	free(V);
 	free(M);
+	free(S);
 	return 0;//*/
 	////////////////////////////////////////////////////////
 
@@ -92,22 +102,10 @@ int main(int argc, char** argv)
 		cout << "#Vystup: <velikost N> <na GPU [ms]>\t<z GPU [ms]>\tprumer\tnejrychlejsi\t1.quartal\tmedian\t3.quartal\tnejpomalejsi\t<celkem [ms]>" << endl;
 		return 0;
 	}
-	unsigned int* A=new unsigned int[N*N];
-	unsigned int* b=new unsigned int[N];
-	unsigned int* jm=new unsigned int[N];
-	load_matrix<unsigned int>(&N, &A, &b, "../diplomka/mat-int.txt");
-	vypsat_mat<unsigned int>(N, N, A, b);
-	gauss_jordan_elim_while(N, modul, A, b, jm);
-
-
-	cout << endl << "-------------------------------" << endl;
-	load_matrix(&N, &A, &b, "../diplomka/mat-int.txt");
-	vypsat_mat(N, N, A, b);
-	GJE_podmatice(N, modul, A, b, jm);
+	// TODO: vypocet
 
 
 #ifdef _DEBUG
-	vypsat_vys<unsigned int>(N, b, jm);
 	cin.get();
 #else
 	delete[] A;

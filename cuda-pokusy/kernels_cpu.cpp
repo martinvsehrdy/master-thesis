@@ -5,17 +5,22 @@
 
 using namespace std;
 
+//#define S_DELENIM
+
+unsigned int elem_uprava_s_delenim(unsigned int modul, unsigned int a_xy, unsigned int a_xp, unsigned int a_py);	// \STATE $a_{xy} := a_{xy} - a_xp \cdot a_py$
+unsigned int elem_uprava_bez_deleni(unsigned int modul, unsigned int a_xy, unsigned int a_pp, unsigned int a_xp, unsigned int a_py);	// \STATE $a_{xy} := a_{xy} \cdot a_pp - a_xp \cdot a_py$
 
 /* 
  * gauss-jordanova eliminace, jednovlaknova, ve for-cyklech, primo na datech ve vstupnim poli, 
  * bez deleni - nasobim oba mergujici radky, po vypoctu kazde bunky se moduluje
  */
-void gauss_jordan_elim_for(int N, int modul, int* m_matice, int* m_prava_strana, int* m_vys_jmenovatel)
+void gauss_jordan_elim_for(int N, int modul, unsigned int* m_matice, unsigned int* m_prava_strana, unsigned int* m_vys_jmenovatel)
 {
 	// TODO: posouvat cisla v radcich doleva, kvuli CUDA, aby se pristupovalo stale na ty stejna mista v pameti, 
 	//       vysledek bude v prvnim sloupci matice
 	for(int ipivot=0;ipivot<N;ipivot++)
 	{
+		cout << ipivot << endl;
 		// deleni nulou => nasobeni inverznim prvkem
 		if(m_matice[get_index(ipivot, ipivot, N)]==0)
 		{
@@ -28,7 +33,7 @@ void gauss_jordan_elim_for(int N, int modul, int* m_matice, int* m_prava_strana,
 			if(m_matice[get_index(ipivot, novy_pivot, N)]!=0 && novy_pivot<N)		// nasel jsem radek s nenulovym prvkem ve sloupci ipivot
 			{
 				// vymena radku ipivot a novy_pivot
-				int pom;
+				unsigned int pom;
 				for(int iX=0;iX<N;iX++)
 				{
 					pom=m_matice[get_index(iX, ipivot, N)];
@@ -45,159 +50,212 @@ void gauss_jordan_elim_for(int N, int modul, int* m_matice, int* m_prava_strana,
 				for(int i=0;i<N;i++)	// singularni matice => vysledky jsou nulove (nepouzitelne)
 				{
 					m_prava_strana[i]=0;
-					m_vys_jmenovatel[i]=1;
+					if(m_vys_jmenovatel!=NULL) m_vys_jmenovatel[i]=1;
 				}
 				return;
 			}
 		}
-		int multipl1 = m_matice[get_index(ipivot, ipivot, N)];
+#ifdef S_DELENIM
+		unsigned int a_pp_inv = compute_inverse(m_matice[get_index(ipivot, ipivot, N)], modul);
+		cout << endl << "vydelit " << a_pp_inv << ": ";
+		// vydelit cely ipivot-ty radek cislem a_pp
+		unsigned long long pom;
+		for(int iX=0;iX<N;iX++)
+		{
+			pom = m_matice[get_index(iX, ipivot, N)];
+			pom *= a_pp_inv;
+			pom %= modul;
+			m_matice[get_index(iX, ipivot, N)]=(unsigned int)pom;
+		}
+		pom = m_prava_strana[ipivot];
+		pom *= a_pp_inv;
+		pom %= modul;
+		m_prava_strana[ipivot]=(unsigned int)pom;
+
+#else
+		unsigned int a_pp = m_matice[get_index(ipivot, ipivot, N)];
+		cout << endl << a_pp << ": ";
+#endif
 		for(int iY=0;iY<N;iY++)	// prochazi jednotlive radky
 		{
 			if(iY==ipivot) continue;
-			int pom;
-			int multipl2 = m_matice[get_index(ipivot, iY, N)];
+			unsigned int a_py = m_matice[get_index(ipivot, iY, N)];
+			cout << a_py << ", ";
 			for(int iX=0;iX<N;iX++)	// prochazi cisla v i1-tem radku
 			{
-				int m1=m_matice[get_index(iX, iY, N)];
-				int m2=m_matice[get_index(iX, ipivot, N)];
-				// TODO: jak cuda moduluje hlavne zaporny cisla? potrebuju interval <0;modul)
-				pom = multipl1*m1-multipl2*m2;
-				pom=pom % modul;
-				//if(pom<0) pom+=modul;
-				m_matice[get_index(iX, iY, N)]=pom;
+				unsigned int a_xy = m_matice[get_index(iX, iY, N)];
+				unsigned int a_xp = m_matice[get_index(iX, ipivot, N)];
+#ifdef S_DELENIM
+				m_matice[get_index(iX, iY, N)]=elem_uprava_s_delenim(modul, a_xy, a_xp, a_py);
+#else
+				m_matice[get_index(iX, iY, N)]=elem_uprava_bez_deleni(modul, a_xy, a_pp, a_xp, a_py);
+#endif
+
 			}
-			pom = multipl1*m_prava_strana[iY]-multipl2*m_prava_strana[ipivot];
-			// TODO: jak cuda moduluje hlavne zaporny cisla? potrebuju interval <0;modul)
-			m_prava_strana[iY]=pom % modul;
-			//if(m_prava_strana[iY]<0) m_prava_strana[iY]+=modul;
+#ifdef S_DELENIM
+			m_prava_strana[iY]=elem_uprava_s_delenim(modul, m_prava_strana[iY], m_prava_strana[ipivot], a_py);
+#else
+			m_prava_strana[iY]=elem_uprava_bez_deleni(modul, m_prava_strana[iY], a_pp, m_prava_strana[ipivot], a_py);
+#endif
+
 		}
 		//cout << "pivot: " << ipivot << endl;
 		//vypsat_matlab(N, m_matice, m_prava_strana);
+		vypsat_mat(N, N, m_matice, m_prava_strana);
+		cout << endl;
 	}
 	// ulozit diagonalu do m_vys_jmenovatel
-	for(int iX=0;iX<N;iX++)
+#ifndef S_DELENIM
+	unsigned long long pom;
+	for(int i=0;i<N;i++)
 	{
-		m_vys_jmenovatel[iX]=m_matice[get_index(iX, iX, N)];
+		pom = m_prava_strana[i];
+		pom *= compute_inverse(m_matice[get_index(i, i, N)], modul);
+		pom %= modul;
+		m_prava_strana[i] = pom;
 	}
+#endif
 }
 /* 
  * gauss-jordanova eliminace, jednovlaknova, ve while-cyklech, primo na datech ve vstupnim poli, 
  * bez deleni - nasobim oba mergujici radky, po vypoctu kazde bunky se moduluje, 
  * dva pristupy k matici: ipivot prochazi pres matici pres radky/sloupce
  */
-void gauss_jordan_elim_while(int N, unsigned int modul, unsigned int* m_matice, unsigned int* m_prava_strana, unsigned int* m_vys_jmenovatel)
+// TODO: matice bude o vel. (N+1) vpravo bude prava strana a posledni radek bude = 0
+void gauss_jordan_elim_while(int Sx, int Sy, unsigned int modul, unsigned int* m_matice)
 {
 	// TODO: posouvat cisla v radcich doleva, kvuli CUDA, aby se pristupovalo stale na ty stejna mista v pameti, 
 	//       vysledek bude v prvnim sloupci matice
+	int Smin=min(Sx, Sy);
+	int bdim=1;
 	int tid=0;
 	int itid;
-	for(int ipivot=0;ipivot<N;ipivot++)
+	for(int ipivot=0;ipivot<Smin;ipivot++)
 	{
 		cout << endl << "pivot=" << ipivot << " ";
-		// deleni nulou => nasobeni inverznim prvkem
-		if(m_matice[get_index(ipivot, ipivot, N)]==0)
+		int novy_pivot;	// CUDA: shared
+		// CUDA: __syncthreads();
+		if(tid==0)
 		{
-			// v 'ipivot'-tem radku na diagonále je nula => vymena s jinym radkem
-			int novy_pivot=ipivot;
-			do{
-				novy_pivot++;
-			}while(m_matice[get_index(ipivot, novy_pivot, N)]==0 && novy_pivot<N);
-
-			if(m_matice[get_index(ipivot, novy_pivot, N)]!=0 && novy_pivot<N)		// nasel jsem radek s nenulovym prvkem ve sloupci ipivot
+				novy_pivot=ipivot;
+			// deleni nulou => nasobeni inverznim prvkem
+			if(m_matice[get_index(ipivot, ipivot, Sx)]==0)
 			{
-				cout << novy_pivot;
-				// vymena radku ipivot a novy_pivot
-				int pom;
-				itid=tid;
-				while(itid<=N)
-				{
-					if(itid==N)
-					{
-						pom=m_prava_strana[ipivot];
-						m_prava_strana[ipivot]=m_prava_strana[novy_pivot];
-						m_prava_strana[novy_pivot]=pom;
-					}else
-					{
-						pom=m_matice[get_index(itid, ipivot, N)];
-						m_matice[get_index(itid, ipivot, N)]=m_matice[get_index(itid, novy_pivot, N)];
-						m_matice[get_index(itid, novy_pivot, N)]=pom;
-					}
-					itid+=1;
-				}
-			}else
-			{
-				// matice nema v 'ipivot'-tem sloupci nenulovy prvek => je singularni
-				//cout << "singularni" << endl;
-				itid=tid;
-				while(itid<=N)	// singularni matice => vysledky jsou nulove (nepouzitelne)
-				{
-					m_prava_strana[itid]=0;
-					m_vys_jmenovatel[itid]=1;
-					itid+=1;
-				}
-				return;
+				// v 'ipivot'-tem radku na diagonále je nula => vymena s jinym radkem
+				do{
+					novy_pivot++;
+				}while(m_matice[get_index(ipivot, novy_pivot, Sx)]==0 && novy_pivot<Smin);
 			}
 		}
-		cout << endl;
-		int multipl1 = m_matice[get_index(ipivot, ipivot, N)];
-		//*/
-		itid=tid;
-		while(itid<N)	// prochazi jednotlive radky
+		// CUDA: __syncthreads();
+		// matice je singularni
+		if(novy_pivot>=Smin)
 		{
-			if(itid==ipivot)
+			// matice nema v 'ipivot'-tem sloupci nenulovy prvek => je singularni
+			//cout << "singularni" << endl;
+			itid=tid;
+			// singularni matice => vysledky jsou nulove (nepouzitelne)
+			//while(itid<=N)
 			{
+					
 				itid+=1;
-				continue;
 			}
-			int pom;
-			int multipl2 = m_matice[get_index(ipivot, itid, N)];
-			// DEBUG
-			cout << multipl1 << "," << multipl2 << " | ";
-
-			for(int iX=0;iX<N;iX++)	// prochazi cisla v i1-tem radku
+			return;
+		}
+		// musim prehodit pivotni radek s jinym
+		if(novy_pivot>ipivot)
+		{
+			cout << novy_pivot;
+			// vymena radku ipivot a novy_pivot
+			itid=tid;
+			unsigned int pom;
+			while(itid<=Sx)
 			{
-				int m1=m_matice[get_index(iX, itid, N)];
-				int m2=m_matice[get_index(iX, ipivot, N)];
-				pom = multipl1*m1-multipl2*m2;
-				pom=pom % modul;
-				m_matice[get_index(iX, itid, N)]=pom;
+				pom=m_matice[get_index(itid, ipivot, Sx)];
+				m_matice[get_index(itid, ipivot, Sx)]=m_matice[get_index(itid, novy_pivot, Sx)];
+				m_matice[get_index(itid, novy_pivot, Sx)]=pom;
+				itid+=bdim;
 			}
-			pom = multipl1*m_prava_strana[itid]-multipl2*m_prava_strana[ipivot];
-			m_prava_strana[itid]=pom % modul;
-			itid+=1;
+		}
+
+		// CUDA: __syncthreads();
+#ifdef S_DELENIM
+		unsigned int a_pp_inv = compute_inverse(m_matice[get_index(ipivot, ipivot, Sx)], modul);
+		cout << endl << "vydelit " << a_pp_inv << ": ";
+		// vydelit cely ipivot-ty radek cislem a_pp
+		itid=tid;
+		while(itid<Sx)
+		{
+			unsigned long long pom = m_matice[get_index(itid, ipivot, Sx)];
+			pom *= a_pp_inv;
+			pom %= modul;
+			m_matice[get_index(itid, ipivot, Sx)]=(unsigned int)pom;
+
+			itid+=bdim;
+		}
+#else
+		unsigned int a_pp = m_matice[get_index(ipivot, ipivot, Sx)];
+		cout << endl << a_pp << ": ";
+#endif
+
+		 /*
+		itid=tid;
+		while(itid<Sy)	// prochazi jednotlive radky
+		{
+			if(itid!=ipivot)
+			{
+				unsigned int a_py = m_matice[get_index(ipivot, itid, Sx)];
+				// DEBUG
+				cout << a_py << ", ";
+
+				for(int iX=0;iX<Sx;iX++)	// prochazi cisla v i1-tem radku
+				{
+					unsigned int a_xy = m_matice[get_index(iX, itid, Sx)];
+					unsigned int a_xp = m_matice[get_index(iX, ipivot, Sx)];
+#ifdef S_DELENIM
+					m_matice[get_index(iX, itid, Sx)] = elem_uprava_s_delenim(modul, a_xy, a_xp, a_py);
+#else
+					m_matice[get_index(iX, itid, Sx)] = elem_uprava_bez_deleni(modul, a_xy, a_pp, a_xp, a_py);
+#endif
+				}
+			}
+			itid+=bdim;
 		}
 		/*/
-		for(int iY=0;iY<N;iY++)	// prochazi jednotlive radky
+		for(int iY=0;iY<Sy;iY++)	// prochazi jednotlive radky
 		{
-			if(iY==ipivot) continue;
-			int pom;
-			int multipl2 = m_matice[get_index(ipivot, iY, N)];
-			itid=tid;
-			while(itid<N)	// prochazi cisla v i1-tem radku
+			if(iY!=ipivot)
 			{
-				int m1=m_matice[get_index(itid, iY, N)];
-				int m2=m_matice[get_index(itid, ipivot, N)];
-				// TODO: jak cuda moduluje hlavne zaporny cisla? potrebuju interval <0;modul)
-				pom = multipl1*m1-multipl2*m2;
-				pom=pom % modul;
-				//if(pom<0) pom+=modul;
-				m_matice[get_index(itid, iY, N)]=pom;
-				itid+=1;
+				unsigned int a_py = m_matice[get_index(ipivot, iY, Sx)];
+				// DEBUG
+				cout << a_py << ", ";
+				itid=tid;
+				while(itid<Sx)	// prochazi cisla v i1-tem radku
+				{
+					unsigned int a_xy = m_matice[get_index(itid, iY, Sx)];
+					unsigned int a_xp = m_matice[get_index(itid, ipivot, Sx)];
+#ifdef S_DELENIM
+					m_matice[get_index(itid, iY, Sx)] = elem_uprava_s_delenim(modul, a_xy, a_xp, a_py);
+#else
+					m_matice[get_index(itid, iY, Sx)] = elem_uprava_bez_deleni(modul, a_xy, a_pp, a_xp, a_py);
+#endif
+					itid+=bdim;
+				}
 			}
-			pom = multipl1*m_prava_strana[iY]-multipl2*m_prava_strana[ipivot];
-			// TODO: jak cuda moduluje hlavne zaporny cisla? potrebuju interval <0;modul)
-			m_prava_strana[iY]=pom % modul;
-			//if(m_prava_strana[iY]<0) m_prava_strana[iY]+=modul;
+			// CUDA: __syncthreads();
 		}//*/
-		vypsat_mat(N, N, m_matice, m_prava_strana);
+		vypsat_mat<unsigned int>(Sx, Sy, m_matice, NULL);
 	}
-	// ulozit diagonalu do m_vys_jmenovatel
-	itid=tid;
-	while(itid<N)
+#ifndef S_DELENIM
+	unsigned long long pom;
+	for(int i=0;i<Smin;i++)
 	{
-		m_vys_jmenovatel[itid]=m_matice[get_index(itid, itid, N)];
-		itid+=1;
+		pom = m_matice[get_index(Sx-1, i, Sx)];
+		pom *= compute_inverse(m_matice[get_index(i, i, Sx)], modul);
+		pom %= modul;
+		m_matice[get_index(Sx-1, i, Sx)] = pom;
 	}
+#endif
 }
 
 void gauss_jordan_elim_p1(int modul, int nx, int ny, int sx, int sy, unsigned int* s_matice, unsigned int* actions, unsigned int* diag_pivot, int zpusob_zprac)
@@ -489,29 +547,6 @@ void copy_podmatice(int N, int sx, int sy, int Sx, int Sy, unsigned int* mat_sha
 	if(copy_to == COPY_TO_GLOBAL_MEM)
 		vypsat_vys<unsigned int>(N, prava_str, NULL);
 }
-// elementarni uprava s delenim
-unsigned int elem_uprava_s_delenim(unsigned int modul, unsigned int a_xy, unsigned int a_xp, unsigned int a_py)
-// \STATE $a_{xy} := a_{xy} - a_xp \cdot a_py$
-{
-	unsigned long long m1;
-	unsigned long long pom;
-
-	pom = a_xy;
-	m1 = a_xp;
-	
-	m1 *= a_py;
-	if(pom >= m1)
-	{
-		pom -= m1;
-		pom %= modul;
-	}else
-	{
-		m1 -= pom;
-		m1 %= modul;
-		pom = modul-m1;
-	}
-	return ((unsigned int)pom);
-}
 // S DELENIM
 void compute_podmatice1(int N, unsigned int modul, int sx, int sy, int Sx, int Sy, unsigned int* s_mat, unsigned int* actions)
 {
@@ -788,9 +823,56 @@ void GJE_podmatice(int N, unsigned int modul, unsigned int* m_matice, unsigned i
 	}
 //\ENDFOR
 }
+// elementarni uprava s delenim
+unsigned int elem_uprava_s_delenim(unsigned int modul, unsigned int a_xy, unsigned int a_xp, unsigned int a_py)
+// \STATE $a_{xy} := a_{xy} - a_xp \cdot a_py$
+{
+	unsigned long long m1;
+	unsigned long long pom;
 
+	pom = a_xy;
+	m1 = a_xp;
+	
+	m1 *= a_py;
+	if(pom >= m1)
+	{
+		pom -= m1;
+		pom %= modul;
+	}else
+	{
+		m1 -= pom;
+		m1 %= modul;
+		pom = modul-m1;
+	}
+	return ((unsigned int)pom);
+}
+// elementarni uprava bez deleni
+unsigned int elem_uprava_bez_deleni(unsigned int modul, unsigned int a_xy, unsigned int a_pp, unsigned int a_xp, unsigned int a_py)
+// \STATE $a_{xy} := a_{xy} \cdot a_pp - a_xp \cdot a_py$
+{
+	unsigned long long m1;
+	unsigned long long pom;
+
+	pom = a_xy;
+	m1 = a_xp;
+	
+	pom *= a_pp;
+	m1 *= a_py;
+	if(pom >= m1)
+	{
+		pom -= m1;
+		pom %= modul;
+	}else
+	{
+		m1 -= pom;
+		m1 %= modul;
+		pom = modul-m1;
+	}
+	return ((unsigned int)pom);
+}
 unsigned int compute_inverse(unsigned int cislo, unsigned int modul)
 {
+	// TODO: pouzit eukliduv alg.
 	unsigned long long inv=cislo;
 	unsigned int i=1;
 	while(i<modul)
