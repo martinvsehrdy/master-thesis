@@ -1,8 +1,6 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 11.00
 # Visual Studio 2010
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "diplomka", "diplomka\diplomka.vcxproj", "{53530840-6A72-4933-A6B7-BAE225F760E6}"
-EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "cuda-pokusy", "cuda-pokusy\cuda-pokusy.vcxproj", "{E3DADAD1-779A-4FDF-9334-D97EEA4310AD}"
 EndProject
 Global
@@ -11,10 +9,6 @@ Global
 		Release|Win32 = Release|Win32
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{53530840-6A72-4933-A6B7-BAE225F760E6}.Debug|Win32.ActiveCfg = Debug|Win32
-		{53530840-6A72-4933-A6B7-BAE225F760E6}.Debug|Win32.Build.0 = Debug|Win32
-		{53530840-6A72-4933-A6B7-BAE225F760E6}.Release|Win32.ActiveCfg = Release|Win32
-		{53530840-6A72-4933-A6B7-BAE225F760E6}.Release|Win32.Build.0 = Release|Win32
 		{E3DADAD1-779A-4FDF-9334-D97EEA4310AD}.Debug|Win32.ActiveCfg = Debug|Win32
 		{E3DADAD1-779A-4FDF-9334-D97EEA4310AD}.Debug|Win32.Build.0 = Debug|Win32
 		{E3DADAD1-779A-4FDF-9334-D97EEA4310AD}.Release|Win32.ActiveCfg = Release|Win32

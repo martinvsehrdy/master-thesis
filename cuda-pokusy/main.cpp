@@ -5,6 +5,8 @@
 #include <list>
 #include "kernels_cpu.h"
 #include "templates_functions.h"
+#include "kernels.h"
+#include "time_measure.h"
 
 using namespace std;
 
@@ -62,8 +64,24 @@ void statistic(list<float> l, float* quartal1, float* quartal2, float* quartal3,
 int main(int argc, char** argv)
 // argv[0] <N> <modul>
 {
+	unsigned int start=get_milisec_from_startup();
+	print_gpus_info();
+	cin.get();
+	cout << "trvalo to: " << (get_milisec_from_startup()-start) << "ms" << endl;
+	cin.get();
+	return 0;
+
 	int N=4;
-	int modul=0x1001; //(~(unsigned int)0);
+	unsigned int modul=0x10000001; //(~(unsigned int)0);
+	modul |= rand();
+	modul = 997;
+	printf("%u = Ox%X\n", modul, modul);
+	for(unsigned int i=1;i<modul;i++)
+	{
+
+		printf("%u \t %u \t %u \t %u \n", i, modinv(i, modul), compute_inverse(i, modul), compute_inverse_eukleides(i, modul));
+	}
+	return 0;
 
 	unsigned int* V=new unsigned int[N*N];
 	unsigned int* M=new unsigned int[N];
@@ -108,8 +126,6 @@ int main(int argc, char** argv)
 #ifdef _DEBUG
 	cin.get();
 #else
-	delete[] A;
-	delete[] b;
-	delete[] jm;
+	
 #endif
 }
