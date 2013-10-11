@@ -581,7 +581,7 @@ void compute_podmatice13(int N, unsigned int modul, int sx, int sy, int Sx, int 
 	unsigned int minS=min( min(Sx, Sy), min(N-Sx*sx, N-Sy*sy) );
 	int pod_diag_x=Sy*sy+Sy-Sx*sx;
 // \FOR{$p$ := $1$ do $Sx$}
-	for(unsigned int isloupec=0;(isloupec<Sx)&&(isloupec<pod_diag_x);isloupec++)
+	for(int isloupec=0;(isloupec<Sx)&&(isloupec<pod_diag_x);isloupec++)
 	{
 		cout << "====================\npivot=" << isloupec << endl;
 		int gdiagx=Sx*sx+isloupec;
@@ -765,11 +765,10 @@ void compute_podmatice13_(int N, unsigned int modul, int sx, int sy, int Sx, int
 	int tid=0;
 	int bdim=1;
 	unsigned int m1=modul;
-	unsigned long long pom;
 	unsigned int minS=min( min(Sx, Sy), min(N-Sx*sx, N-Sy*sy) );
 	int pod_diag_x=Sy*sy+Sy-Sx*sx;
 // \FOR{$p$ := $1$ do $Sx$}
-	for(unsigned int isloupec=0;isloupec<Sx;isloupec++)
+	for(int isloupec=0;isloupec<Sx;isloupec++)
 	{
 		cout << "====================\npivot=" << isloupec << endl;
 		int gdiagx=Sx*sx+isloupec;
@@ -871,7 +870,7 @@ unsigned int compute_inverse(unsigned int cislo, unsigned int modul)
 
 unsigned int compute_inverse_eukleides(unsigned int cislo, unsigned int modul)
 {
-	unsigned int a, b, a1, a2, q, r, t;
+	unsigned int a, b, a1, a2, q, r;
 	a = cislo;
 	b = modul;
 	a1 = 0;

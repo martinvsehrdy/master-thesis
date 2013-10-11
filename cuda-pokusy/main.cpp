@@ -64,24 +64,10 @@ void statistic(list<float> l, float* quartal1, float* quartal2, float* quartal3,
 int main(int argc, char** argv)
 // argv[0] <N> <modul>
 {
-	unsigned int start=get_milisec_from_startup();
-	print_gpus_info();
-	cin.get();
-	cout << "trvalo to: " << (get_milisec_from_startup()-start) << "ms" << endl;
-	cin.get();
-	return 0;
-
 	int N=4;
 	unsigned int modul=0x10000001; //(~(unsigned int)0);
 	modul |= rand();
-	modul = 997;
-	printf("%u = Ox%X\n", modul, modul);
-	for(unsigned int i=1;i<modul;i++)
-	{
-
-		printf("%u \t %u \t %u \t %u \n", i, compute_inverse(i, modul), compute_inverse_eukleides(i, modul));
-	}
-	return 0;
+	modul = 0x1003;	// 4099 je prvocislo
 
 	unsigned int* V=new unsigned int[N*N];
 	unsigned int* M=new unsigned int[N];
@@ -96,9 +82,9 @@ int main(int argc, char** argv)
 	unsigned int* S=new unsigned int[N*N+N];
 	load_matrix<unsigned int>(&N, &V, &M, "../diplomka/mat-int.txt");
 	vypsat_mat<unsigned int>(N, N, V, M);
-	copy_podmatice(N, 0, 0, N+1, N, S, V, M, COPY_TO_SHARED_MEM);
+	copy_podmatice(N, 0, 0, N+1, N, S, V, M, COPY_MAT_B_GLOB_TO_A_SH);
 	gauss_jordan_elim_while(N+1, N, modul, S);
-	copy_podmatice(N, 0, 0, N+1, N, S, V, M, COPY_TO_GLOBAL_MEM);
+	copy_podmatice(N, 0, 0, N+1, N, S, V, M, COPY_MAT_A_SH_TO_B_GLOB);
 	vypsat_mat<unsigned int>(N, N, V, M);
 	
 #ifdef _DEBUG
