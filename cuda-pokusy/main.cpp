@@ -79,7 +79,7 @@ int main(int argc, char** argv)
 	for(unsigned int i=1;i<modul;i++)
 	{
 
-		printf("%u \t %u \t %u \t %u \n", i, modinv(i, modul), compute_inverse(i, modul), compute_inverse_eukleides(i, modul));
+		printf("%u \t %u \t %u \t %u \n", i, compute_inverse(i, modul), compute_inverse_eukleides(i, modul));
 	}
 	return 0;
 
