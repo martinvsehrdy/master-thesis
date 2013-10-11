@@ -5,6 +5,8 @@
 #include <list>
 #include "kernels_cpu.h"
 #include "templates_functions.h"
+#include "kernels.h"
+#include "time_measure.h"
 
 using namespace std;
 
@@ -62,23 +64,49 @@ void statistic(list<float> l, float* quartal1, float* quartal2, float* quartal3,
 int main(int argc, char** argv)
 // argv[0] <N> <modul>
 {
+	unsigned int start=get_milisec_from_startup();
+	print_gpus_info();
+	cin.get();
+	cout << "trvalo to: " << (get_milisec_from_startup()-start) << "ms" << endl;
+	cin.get();
+	return 0;
+
 	int N=4;
-	int modul=0x1001; //(~(unsigned int)0);
+	unsigned int modul=0x10000001; //(~(unsigned int)0);
+	modul |= rand();
+	modul = 997;
+	printf("%u = Ox%X\n", modul, modul);
+	for(unsigned int i=1;i<modul;i++)
+	{
+
+		printf("%u \t %u \t %u \t %u \n", i, compute_inverse(i, modul), compute_inverse_eukleides(i, modul));
+	}
+	return 0;
 
 	unsigned int* V=new unsigned int[N*N];
 	unsigned int* M=new unsigned int[N];
 
 	load_matrix<unsigned int>(&N, &V, &M, "../diplomka/mat-int.txt");
 	vypsat_mat<unsigned int>(N, N, V, M);
-	GJE_podmatice(N, modul, V, M, NULL);
+	//GJE_podmatice(N, modul, V, M, NULL);
+	gauss_jordan_elim_for(N, modul, V, M, NULL);
 	vypsat_mat<unsigned int>(N, N, V, M);
 	
+	cout << "===================================================" << endl;
+	unsigned int* S=new unsigned int[N*N+N];
+	load_matrix<unsigned int>(&N, &V, &M, "../diplomka/mat-int.txt");
+	vypsat_mat<unsigned int>(N, N, V, M);
+	copy_podmatice(N, 0, 0, N+1, N, S, V, M, COPY_TO_SHARED_MEM);
+	gauss_jordan_elim_while(N+1, N, modul, S);
+	copy_podmatice(N, 0, 0, N+1, N, S, V, M, COPY_TO_GLOBAL_MEM);
+	vypsat_mat<unsigned int>(N, N, V, M);
 	
 #ifdef _DEBUG
 	cin.get();
 #endif
 	free(V);
 	free(M);
+	free(S);
 	return 0;//*/
 	////////////////////////////////////////////////////////
 
@@ -92,25 +120,12 @@ int main(int argc, char** argv)
 		cout << "#Vystup: <velikost N> <na GPU [ms]>\t<z GPU [ms]>\tprumer\tnejrychlejsi\t1.quartal\tmedian\t3.quartal\tnejpomalejsi\t<celkem [ms]>" << endl;
 		return 0;
 	}
-	unsigned int* A=new unsigned int[N*N];
-	unsigned int* b=new unsigned int[N];
-	unsigned int* jm=new unsigned int[N];
-	load_matrix<unsigned int>(&N, &A, &b, "../diplomka/mat-int.txt");
-	vypsat_mat<unsigned int>(N, N, A, b);
-
-
-	cout << endl << "-------------------------------" << endl;
-	load_matrix(&N, &A, &b, "../diplomka/mat-int.txt");
-	vypsat_mat(N, N, A, b);
-	GJE_podmatice(N, modul, A, b, jm);
+	// TODO: vypocet
 
 
 #ifdef _DEBUG
-	vypsat_vys<unsigned int>(N, b, jm);
 	cin.get();
 #else
-	delete[] A;
-	delete[] b;
-	delete[] jm;
+	
 #endif
 }
