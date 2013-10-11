@@ -104,7 +104,6 @@ void gauss_jordan_elim_for(int N, int modul, unsigned int* m_matice, unsigned in
 		vypsat_mat(N, N, m_matice, m_prava_strana);
 		cout << endl;
 	}
-	// ulozit diagonalu do m_vys_jmenovatel
 #ifndef S_DELENIM
 	unsigned long long pom;
 	for(int i=0;i<N;i++)
@@ -112,7 +111,7 @@ void gauss_jordan_elim_for(int N, int modul, unsigned int* m_matice, unsigned in
 		pom = m_prava_strana[i];
 		pom *= compute_inverse(m_matice[get_index(i, i, N)], modul);
 		pom %= modul;
-		m_prava_strana[i] = pom;
+		m_prava_strana[i] = (unsigned int)pom;
 	}
 #endif
 }
@@ -253,7 +252,7 @@ void gauss_jordan_elim_while(int Sx, int Sy, unsigned int modul, unsigned int* m
 		pom = m_matice[get_index(Sx-1, i, Sx)];
 		pom *= compute_inverse(m_matice[get_index(i, i, Sx)], modul);
 		pom %= modul;
-		m_matice[get_index(Sx-1, i, Sx)] = pom;
+		m_matice[get_index(Sx-1, i, Sx)] = (unsigned int)pom;
 	}
 #endif
 }
@@ -561,14 +560,14 @@ void compute_podmatice1(int N, unsigned int modul, int sx, int sy, int Sx, int S
 	int bdim=1;
 	unsigned int m1;
 	unsigned long long pom;
-	unsigned int minS=min( min(Sx, Sy), min(N-Sx*sx, N-Sy*sy) );
+	int minS=min( min(Sx, Sy), min(N-Sx*sx, N-Sy*sy) );
 	// \FOR{$p$ := $1$ do $N$}
-	for(unsigned int ipivot=0;ipivot<minS;ipivot++)
+	for(int ipivot=0;ipivot<minS;ipivot++)
 	{
 		// todo: jak se to chova pri S=4, ipivot=3
 		cout << endl << "ipivot = " << ipivot << endl;
 		vypsat_mat<unsigned int>(Sx, Sy, s_mat, NULL);
-		unsigned int novy_pivot;
+		int novy_pivot;
 		if(tid==0)
 		{
 			novy_pivot=ipivot;
@@ -667,13 +666,13 @@ void compute_podmatice2(int N, unsigned int modul, int sx, int sy, int Sx, int S
 	int bdim=1;
 	unsigned int m1;
 	unsigned long long pom;
-	unsigned int minS=min( min(Sx, Sy), min(N-Sx*sx, N-Sy*sy) );
+	int minS=min( min(Sx, Sy), min(N-Sx*sx, N-Sy*sy) );
 	// \FOR{$p$ := $1$ do $N$}
-	for(unsigned int ipivot=0;ipivot<minS;ipivot++)
+	for(int ipivot=0;ipivot<minS;ipivot++)
 	{
 		cout << endl << "ipivot = " << ipivot << endl;
 		vypsat_mat<unsigned int>(Sx, Sy, s_mat, NULL);
-		unsigned int novy_pivot;
+		int novy_pivot;
 		
 		// cuda: synchronize
 		novy_pivot=actions[ipivot];
@@ -884,6 +883,39 @@ unsigned int compute_inverse(unsigned int cislo, unsigned int modul)
 		inv+=cislo;
 		inv%=modul;
 		i++;
+	}
+	return (unsigned int)0;
+}
+
+unsigned int compute_inverse_eukleides(unsigned int cislo, unsigned int modul)
+{
+	unsigned int a, b, a1, a2, q, r, t;
+	a = cislo;
+	b = modul;
+	a1 = 0;
+	a2 = 1;
+	int plus = 1;
+
+	while( b!=0 )
+	{
+		q = a / b;
+		r = a % b;
+		a = b;
+		b = r;
+		r = a1;
+		a1 = a2 + r*q;
+		a2 = r;
+		plus=-plus;
+	}
+	if( a==1 )
+	{
+		if( 0<plus )
+		{
+			return (unsigned int)a2;
+		}else
+		{
+			return (unsigned int)(modul-a2);
+		}
 	}
 	return (unsigned int)0;
 }
