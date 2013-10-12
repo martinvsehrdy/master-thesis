@@ -3,11 +3,8 @@
 
 
 /* kernels.cpp */
-void gener_primes();
 unsigned int compute_inverse(unsigned int cislo, unsigned int modul);
 unsigned int compute_inverse_eukleides(unsigned int cislo, unsigned int modul);
-void gener_inverse(unsigned int modul, unsigned int* inverse);
-unsigned int get_inverse(unsigned int prvek, unsigned int* arr_inverse);
 void gauss_jordan_elim_for(int N, int modul, unsigned int* m_matice, unsigned int* m_prava_strana, unsigned int* m_vys_jmenovatel);
 void gauss_jordan_elim_while(int Sx, int Sy, unsigned int modul, unsigned int* m_matice);
 int get_index(int X, int Y, int N);

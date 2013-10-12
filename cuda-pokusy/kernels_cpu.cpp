@@ -900,38 +900,6 @@ unsigned int compute_inverse_eukleides(unsigned int cislo, unsigned int modul)
 	}
 	return (unsigned int)0;
 }
-/* inverse = [1;modul-1], size(inverse)=(modul-1)
- * inverzni k cislu A je inverse[A-1]
- */
-void gener_inverse(unsigned int modul, unsigned int* inverse)
-{
-	unsigned int tid=(unsigned int)0;
-	int bdim=1;	// blockDim.x;
-
-	unsigned int cislo=tid;
-	while(cislo<modul)
-	{
-		inverse[cislo]=0;
-		cislo+=bdim;
-	}
-	
-	cislo=tid+1;
-	while(cislo<modul)
-	{
-		if(inverse[cislo]==0)
-		{
-			unsigned int inv=compute_inverse(cislo, modul);
-			inverse[cislo]=inv;
-			inverse[inv]=cislo;
-		}
-		cislo+=bdim;
-	}
-}
-unsigned int get_inverse(unsigned int prvek, unsigned int* arr_inverse)
-{
-	if(arr_inverse==NULL) return 0;
-	return arr_inverse[prvek];
-}
 
 int get_index(int X, int Y, int N)	// SLOUPEC, RADEK
 {

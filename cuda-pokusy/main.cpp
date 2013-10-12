@@ -64,15 +64,17 @@ void statistic(list<float> l, float* quartal1, float* quartal2, float* quartal3,
 int main(int argc, char** argv)
 // argv[0] <N> <modul>
 {
+	print_gpus_info();
 	int N=4;
 	unsigned int modul=0x10000001; //(~(unsigned int)0);
 	modul |= rand();
-	modul = 0x1003;	// 4099 je prvocislo
-
+	//modul = 0x1003;	// 4099 je prvocislo
+	
 	unsigned int* V=new unsigned int[N*N];
 	unsigned int* M=new unsigned int[N];
 
-	load_matrix<unsigned int>(&N, &V, &M, "../diplomka/mat-int.txt");
+	//load_matrix<unsigned int>(&N, &V, &M, "mat-int.txt");
+	hilbert_matrix<unsigned int>(N, V, M);
 	vypsat_mat<unsigned int>(N, N, V, M);
 	//GJE_podmatice(N, modul, V, M, NULL);
 	gauss_jordan_elim_for(N, modul, V, M, NULL);
@@ -80,11 +82,18 @@ int main(int argc, char** argv)
 	
 	cout << "===================================================" << endl;
 	unsigned int* S=new unsigned int[N*N+N];
-	load_matrix<unsigned int>(&N, &V, &M, "../diplomka/mat-int.txt");
+	//load_matrix<unsigned int>(&N, &V, &M, "mat-int.txt");
+	hilbert_matrix<unsigned int>(N, V, M);
 	vypsat_mat<unsigned int>(N, N, V, M);
+	//*
+	// na GPU
+	cuda_GJE_while(N, modul, V, M);
+	/*/
+	// na CPU
 	copy_podmatice(N, 0, 0, N+1, N, S, V, M, COPY_MAT_B_GLOB_TO_A_SH);
 	gauss_jordan_elim_while(N+1, N, modul, S);
 	copy_podmatice(N, 0, 0, N+1, N, S, V, M, COPY_MAT_A_SH_TO_B_GLOB);
+	//*/
 	vypsat_mat<unsigned int>(N, N, V, M);
 	
 #ifdef _DEBUG

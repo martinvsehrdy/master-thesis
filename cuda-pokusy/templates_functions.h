@@ -4,7 +4,20 @@
 #include <fstream>
 #include "kernels_cpu.h"
 
-
+template<class TYPE>
+void hilbert_matrix(int N, TYPE* matice, TYPE* prava_strana)
+{
+	TYPE a;
+	for(int y=0;y<N;y++)
+	{
+		for(int x=0;x<N;x++)
+		{
+			a = (TYPE)(100.0/((double)(x+y+2)));
+			matice[get_index(x, y, N)]=a;
+		}
+		prava_strana[y]=y+1;
+	}
+}
 template<class TYPE>
 int load_matrix(int* N, TYPE** matice, TYPE** prava_strana, char* filename)
 {
