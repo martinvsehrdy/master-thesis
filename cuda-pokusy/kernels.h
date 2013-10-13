@@ -3,6 +3,8 @@
 
 #include <cuda_runtime.h>
 
+static unsigned int gpu_time;
+
 /* kernels.cu */
 void print_gpus_info(void);
 void print_cuda_err(cudaError_t cudaErr);

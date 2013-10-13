@@ -3,8 +3,11 @@
 #include <cuda.h>
 #include <cuda_runtime.h>
 #include "kernels.h"
+#include "time_measure.h"
 
 static cudaDeviceProp gpu_property;
+
+#define S_DELENIM
 
 using namespace std;
 
@@ -102,8 +105,8 @@ __device__ unsigned int cuda_elem_uprava_bez_deleni(unsigned int modul, unsigned
 //#define COPY_MAT_A_SH_TO_B_SH 	3
 __device__ void cuda_copy_podmatice(int N, int sx, int sy, int Sx, int Sy, unsigned int* mat_A, unsigned int* mat_B, unsigned int* prava_str, int copy_to)
 {
-	int tid=0;
-	int bdim=1;
+	int tid=threadIdx.x;
+	int bdim=blockDim.x;
 	int itid=tid;
 	while(itid<Sy)
 	{
@@ -161,8 +164,8 @@ __device__ void gauss_jordan_elim_while_kernel(int Sx, int Sy, unsigned int modu
 	// TODO: posouvat cisla v radcich doleva, kvuli CUDA, aby se pristupovalo stale na ty stejna mista v pameti, 
 	//       vysledek bude v prvnim sloupci matice
 	int Smin=min(Sx, Sy);
-	int bdim=1;
-	int tid=0;
+	int tid=threadIdx.x;
+	int bdim=blockDim.x;
 	int itid;
 	for(int ipivot=0;ipivot<Smin;ipivot++)
 	{
@@ -191,7 +194,7 @@ __device__ void gauss_jordan_elim_while_kernel(int Sx, int Sy, unsigned int modu
 			//while(itid<=N)
 			{
 					
-				itid+=1;
+				itid+=bdim;
 			}
 			return;
 		}
@@ -212,8 +215,7 @@ __device__ void gauss_jordan_elim_while_kernel(int Sx, int Sy, unsigned int modu
 
 		__syncthreads();
 #ifdef S_DELENIM
-		unsigned int a_pp_inv = compute_inverse(m_matice[cuda_get_index(ipivot, ipivot, Sx)], modul);
-		cout << endl << "vydelit " << a_pp_inv << ": ";
+		unsigned int a_pp_inv = cuda_compute_inverse_eukleides(m_matice[cuda_get_index(ipivot, ipivot, Sx)], modul);
 		// vydelit cely ipivot-ty radek cislem a_pp
 		itid=tid;
 		while(itid<Sx)
@@ -236,8 +238,6 @@ __device__ void gauss_jordan_elim_while_kernel(int Sx, int Sy, unsigned int modu
 			if(itid!=ipivot)
 			{
 				unsigned int a_py = m_matice[cuda_get_index(ipivot, itid, Sx)];
-				// DEBUG
-				cout << a_py << ", ";
 
 				for(int iX=0;iX<Sx;iX++)	// prochazi cisla v i1-tem radku
 				{
@@ -277,12 +277,14 @@ __device__ void gauss_jordan_elim_while_kernel(int Sx, int Sy, unsigned int modu
 	}
 #ifndef S_DELENIM
 	unsigned long long pom;
-	for(int i=0;i<Smin;i++)
+	itid=tid;
+	while(itid<Smin)
 	{
-		pom = m_matice[cuda_get_index(Sx-1, i, Sx)];
-		pom *= cuda_compute_inverse_eukleides(m_matice[cuda_get_index(i, i, Sx)], modul);
+		pom = m_matice[cuda_get_index(Sx-1, itid, Sx)];
+		pom *= cuda_compute_inverse_eukleides(m_matice[cuda_get_index(itid, itid, Sx)], modul);
 		pom %= modul;
-		m_matice[cuda_get_index(Sx-1, i, Sx)] = (unsigned int)pom;
+		m_matice[cuda_get_index(Sx-1, itid, Sx)] = (unsigned int)pom;
+		itid+=bdim;
 	}
 #endif
 }
@@ -300,7 +302,7 @@ __global__ void cuda_GJE_podmatice(int N, int modul, unsigned int* g_matice, uns
 {
 	int Sx=N+1;
 	int Sy=N;
-	__shared__ unsigned int s_mat[1000];
+	__shared__ unsigned int s_mat[4000];
 	cuda_copy_podmatice(N, 0, 0, Sx, Sy, s_mat, g_matice, g_prava_strana, COPY_MAT_B_GLOB_TO_A_SH);
 	gauss_jordan_elim_while_kernel(Sx, Sy, modul, s_mat);
 	cuda_copy_podmatice(N, 0, 0, Sx, Sy, s_mat, g_matice, g_prava_strana, COPY_MAT_A_SH_TO_B_GLOB);
@@ -313,8 +315,10 @@ void cuda_GJE_while(int N, int modul, unsigned int* m_matice, unsigned int* m_pr
 	cudaMalloc((void**)&g_prava_strana, N*sizeof(unsigned int));
 	cudaMemcpy(g_matice, m_matice, (N*N)*sizeof(unsigned int), cudaMemcpyHostToDevice);
 	cudaMemcpy(g_prava_strana, m_prava_strana, N*sizeof(unsigned int), cudaMemcpyHostToDevice);
+	unsigned int start_time=get_milisec_from_startup();
 	cuda_GJE_podmatice<<<1,32>>>(N, modul, g_matice, g_prava_strana);
 	cudaThreadSynchronize();
+	gpu_time=(get_milisec_from_startup()-start_time);
 	cudaMemcpy(m_matice, g_matice, (N*N)*sizeof(unsigned int), cudaMemcpyDeviceToHost);
 	cudaMemcpy(m_prava_strana, g_prava_strana, N*sizeof(unsigned int), cudaMemcpyDeviceToHost);
 	cudaFree(g_matice);

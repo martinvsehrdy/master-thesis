@@ -64,7 +64,7 @@ void gauss_jordan_elim_for(int N, int modul, unsigned int* m_matice, unsigned in
 	//       vysledek bude v prvnim sloupci matice
 	for(int ipivot=0;ipivot<N;ipivot++)
 	{
-		cout << ipivot << endl;
+		//cout << ipivot << endl;
 		// deleni nulou => nasobeni inverznim prvkem
 		if(m_matice[get_index(ipivot, ipivot, N)]==0)
 		{
@@ -101,7 +101,7 @@ void gauss_jordan_elim_for(int N, int modul, unsigned int* m_matice, unsigned in
 		}
 #ifdef S_DELENIM
 		unsigned int a_pp_inv = compute_inverse(m_matice[get_index(ipivot, ipivot, N)], modul);
-		cout << endl << "vydelit " << a_pp_inv << ": ";
+		//cout << endl << "vydelit " << a_pp_inv << ": ";
 		// vydelit cely ipivot-ty radek cislem a_pp
 		unsigned long long pom;
 		for(int iX=0;iX<N;iX++)
@@ -118,13 +118,13 @@ void gauss_jordan_elim_for(int N, int modul, unsigned int* m_matice, unsigned in
 
 #else
 		unsigned int a_pp = m_matice[get_index(ipivot, ipivot, N)];
-		cout << endl << a_pp << ": ";
+		//cout << endl << a_pp << ": ";
 #endif
 		for(int iY=0;iY<N;iY++)	// prochazi jednotlive radky
 		{
 			if(iY==ipivot) continue;
 			unsigned int a_py = m_matice[get_index(ipivot, iY, N)];
-			cout << a_py << ", ";
+			//cout << a_py << ", ";
 			for(int iX=0;iX<N;iX++)	// prochazi cisla v i1-tem radku
 			{
 				unsigned int a_xy = m_matice[get_index(iX, iY, N)];
@@ -145,8 +145,8 @@ void gauss_jordan_elim_for(int N, int modul, unsigned int* m_matice, unsigned in
 		}
 		//cout << "pivot: " << ipivot << endl;
 		//vypsat_matlab(N, m_matice, m_prava_strana);
-		vypsat_mat(N, N, m_matice, m_prava_strana);
-		cout << endl;
+		//vypsat_mat(N, N, m_matice, m_prava_strana);
+		//cout << endl;
 	}
 #ifndef S_DELENIM
 	unsigned long long pom;

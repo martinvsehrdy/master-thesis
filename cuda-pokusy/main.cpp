@@ -64,30 +64,36 @@ void statistic(list<float> l, float* quartal1, float* quartal2, float* quartal3,
 int main(int argc, char** argv)
 // argv[0] <N> <modul>
 {
-	print_gpus_info();
-	int N=4;
+	int N=5;
 	unsigned int modul=0x10000001; //(~(unsigned int)0);
 	modul |= rand();
 	//modul = 0x1003;	// 4099 je prvocislo
-	
+	cout << "Modul = " << modul << endl;
 	unsigned int* V=new unsigned int[N*N];
 	unsigned int* M=new unsigned int[N];
 
 	//load_matrix<unsigned int>(&N, &V, &M, "mat-int.txt");
 	hilbert_matrix<unsigned int>(N, V, M);
 	vypsat_mat<unsigned int>(N, N, V, M);
+	unsigned int start_time=get_milisec_from_startup();
 	//GJE_podmatice(N, modul, V, M, NULL);
 	gauss_jordan_elim_for(N, modul, V, M, NULL);
+	unsigned int end_time = get_milisec_from_startup() - start_time;
+	cout << "time: " << end_time << endl;
 	vypsat_mat<unsigned int>(N, N, V, M);
 	
 	cout << "===================================================" << endl;
+	
 	unsigned int* S=new unsigned int[N*N+N];
 	//load_matrix<unsigned int>(&N, &V, &M, "mat-int.txt");
 	hilbert_matrix<unsigned int>(N, V, M);
 	vypsat_mat<unsigned int>(N, N, V, M);
 	//*
 	// na GPU
+	start_time=get_milisec_from_startup();
 	cuda_GJE_while(N, modul, V, M);
+	end_time = get_milisec_from_startup() - start_time;
+	cout << "time: " << end_time << endl;
 	/*/
 	// na CPU
 	copy_podmatice(N, 0, 0, N+1, N, S, V, M, COPY_MAT_B_GLOB_TO_A_SH);
