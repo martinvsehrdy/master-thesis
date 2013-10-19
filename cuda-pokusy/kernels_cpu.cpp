@@ -2,6 +2,7 @@
 #include "kernels_cpu.h"
 #include "templates_functions.h"
 #include <cstdio>
+#include "time_measure.h"
 
 using namespace std;
 
@@ -60,8 +61,7 @@ unsigned int elem_uprava_bez_deleni(unsigned int modul, unsigned int a_xy, unsig
  */
 void gauss_jordan_elim_for(int N, int modul, unsigned int* m_matice, unsigned int* m_prava_strana, unsigned int* m_vys_jmenovatel)
 {
-	// TODO: posouvat cisla v radcich doleva, kvuli CUDA, aby se pristupovalo stale na ty stejna mista v pameti, 
-	//       vysledek bude v prvnim sloupci matice
+	unsigned int start_time = get_milisec_from_startup();
 	for(int ipivot=0;ipivot<N;ipivot++)
 	{
 		//cout << ipivot << endl;
@@ -158,6 +158,7 @@ void gauss_jordan_elim_for(int N, int modul, unsigned int* m_matice, unsigned in
 		m_prava_strana[i] = (unsigned int)pom;
 	}
 #endif
+	measured_time = get_milisec_from_startup() - start_time;
 }
 /* 
  * gauss-jordanova eliminace, jednovlaknova, ve while-cyklech, primo na datech ve vstupnim poli, 
@@ -787,11 +788,6 @@ void GJE_podmatice(int N, unsigned int modul, unsigned int* m_matice, unsigned i
 	int Smin=min(Sx, Sy);
 	unsigned int* s_matice=(unsigned int*)malloc(Sx*(Sy+Sx)*sizeof(unsigned int));
 	unsigned int* actions=(unsigned int*)malloc((Sx*Sy+Smin)*sizeof(unsigned int));
-#ifdef DELENI
-	// todo: inicializace inverse, inverze vsech prvku zabere 2 až 4 GB pameti
-#else
-	// inverse := null
-#endif
 
 // \FOR{$p$ := $1$ do $\lceil\frac{N}{\min(S_x, S_y)}\rceil$}
 	for(int ipivot=0;ipivot<ceil((double)N/Smin);ipivot++)

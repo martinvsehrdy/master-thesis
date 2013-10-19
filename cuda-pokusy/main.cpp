@@ -64,69 +64,73 @@ void statistic(list<float> l, float* quartal1, float* quartal2, float* quartal3,
 int main(int argc, char** argv)
 // argv[0] <N> <modul>
 {
-	int N=5;
-	unsigned int modul=0x10000001; //(~(unsigned int)0);
+	int N=8;
+	unsigned int modul=0x10000003; //(~(unsigned int)0);
 	modul |= rand();
-	//modul = 0x1003;	// 4099 je prvocislo
+	modul = 0x1003;	// 4099 je prvocislo
 	cout << "Modul = " << modul << endl;
-	unsigned int* V=new unsigned int[N*N];
-	unsigned int* M=new unsigned int[N];
-
-	//load_matrix<unsigned int>(&N, &V, &M, "mat-int.txt");
-	hilbert_matrix<unsigned int>(N, V, M);
-	vypsat_mat<unsigned int>(N, N, V, M);
-	unsigned int start_time=get_milisec_from_startup();
-	//GJE_podmatice(N, modul, V, M, NULL);
-	gauss_jordan_elim_for(N, modul, V, M, NULL);
-	unsigned int end_time = get_milisec_from_startup() - start_time;
-	cout << "time: " << end_time << endl;
-	vypsat_mat<unsigned int>(N, N, V, M);
-	
-	cout << "===================================================" << endl;
-	
-	unsigned int* S=new unsigned int[N*N+N];
-	//load_matrix<unsigned int>(&N, &V, &M, "mat-int.txt");
-	hilbert_matrix<unsigned int>(N, V, M);
-	vypsat_mat<unsigned int>(N, N, V, M);
-	//*
-	// na GPU
-	start_time=get_milisec_from_startup();
-	cuda_GJE_while(N, modul, V, M);
-	end_time = get_milisec_from_startup() - start_time;
-	cout << "time: " << end_time << endl;
-	/*/
-	// na CPU
-	copy_podmatice(N, 0, 0, N+1, N, S, V, M, COPY_MAT_B_GLOB_TO_A_SH);
-	gauss_jordan_elim_while(N+1, N, modul, S);
-	copy_podmatice(N, 0, 0, N+1, N, S, V, M, COPY_MAT_A_SH_TO_B_GLOB);
-	//*/
-	vypsat_mat<unsigned int>(N, N, V, M);
-	
+	unsigned int* M=new unsigned int[N*N];
+	unsigned int* P=new unsigned int[N];
+	hilbert_matrix(N, M, P);
+	vypsat_mat(N, N, M, P);
+	GJE_podmatice(N, modul, M, P, NULL);
+	vypsat_mat(N, N, M, P);
 #ifdef _DEBUG
 	cin.get();
 #endif
-	free(V);
-	free(M);
-	free(S);
-	return 0;//*/
 	////////////////////////////////////////////////////////
-
+	int zpusob=0;
 	if(argc>2)
 	{
 		N=atoi(argv[1]);
-		modul=atoi(argv[2]);
+		zpusob=atoi(argv[2]);
 	}else
 	{
-		cout << "#Program spustte ve tvaru:" << argv[0] << " <N> <modul>" << endl;
+		cout << "#Program spustte ve tvaru:" << argv[0] << " <N> <zpusob zpracovani>" << endl;
+		cout << "zpusob zpracovani: 1 - na CPU s delenim" << endl;
+		cout << "                   2 - na CPU bez deleni" << endl;
+		cout << "                   3 - na GPU s deleni" << endl;
+		cout << "                   4 - na GPU bez deleni" << endl;
 		cout << "#Vystup: <velikost N> <na GPU [ms]>\t<z GPU [ms]>\tprumer\tnejrychlejsi\t1.quartal\tmedian\t3.quartal\tnejpomalejsi\t<celkem [ms]>" << endl;
 		return 0;
 	}
 	// TODO: vypocet
+	unsigned int* A=new unsigned int[N*N];
+	unsigned int* b=new unsigned int[N];
 
+	hilbert_matrix<unsigned int>(N, A, b);
+#ifdef _DEBUG
+	vypsat_mat<unsigned int>(N, N, A, b);
+#endif
 
+	switch(zpusob)
+	{
+	case 1:
+		gauss_jordan_elim_for(N, modul, A, b, NULL);
+		break;
+	case 2:
+		gauss_jordan_elim_for(N, modul, A, b, NULL);
+		break;
+	case 3:
+		cuda_GJE_while(N, modul, A, b);
+		break;
+	case 4:
+		cuda_GJE_while(N, modul, A, b);
+		break;
+	}
+	cout << measured_time;
+
+#ifdef _DEBUG
+	vypsat_mat<unsigned int>(N, N, A, b);
+	cout << "===================================================" << endl;
+#endif
+	
 #ifdef _DEBUG
 	cin.get();
 #else
 	
 #endif
+	free(A);
+	free(b);
+	return 0;
 }

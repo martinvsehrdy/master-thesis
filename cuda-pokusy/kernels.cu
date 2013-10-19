@@ -1,15 +1,15 @@
 #include <stdio.h>
-#include <iostream>
+#include <cstdio>
 #include <cuda.h>
 #include <cuda_runtime.h>
 #include "kernels.h"
 #include "time_measure.h"
 
-static cudaDeviceProp gpu_property;
 
-#define S_DELENIM
-
-using namespace std;
+//#define S_DELENIM
+#define COPY_MAT_B_GLOB_TO_A_SH	1
+#define COPY_MAT_A_SH_TO_B_GLOB	2
+#define COPY_MAT_A_SH_TO_B_SH 	3
 
 __device__ int cuda_get_index(int X, int Y, int N)	// SLOUPEC, RADEK
 {
@@ -309,6 +309,7 @@ __global__ void cuda_GJE_podmatice(int N, int modul, unsigned int* g_matice, uns
 }
 void cuda_GJE_while(int N, int modul, unsigned int* m_matice, unsigned int* m_prava_strana)
 {
+	if(num_of_gpu<=0) return;
 	// TODO: dynamicky alokovana sdilena pamet
 	unsigned int *g_matice, *g_prava_strana;
 	cudaMalloc((void**)&g_matice, (N*N)*sizeof(unsigned int));
@@ -328,14 +329,14 @@ void cuda_GJE_while(int N, int modul, unsigned int* m_matice, unsigned int* m_pr
 
 void init_gpu_compute(void)
 {
-	int count;
-    cudaGetDeviceCount( &count);
-	if (0<count) cudaGetDeviceProperties( &gpu_property, 0);
+	num_of_gpu=0;
+    cudaGetDeviceCount( &num_of_gpu);
+	if (0<num_of_gpu) cudaGetDeviceProperties( &gpu_property, 0);
 }
 void print_gpus_info(void)
 {
 	cudaDeviceProp prop;
-    int count;
+    int count=0;
  
     cudaGetDeviceCount( &count);
 	printf("Pocet CUDA zarizeni: %d\n", count);
@@ -388,13 +389,13 @@ void print_cuda_err(cudaError_t cudaErr)
 {
 	switch(cudaErr)
 	{
-	case cudaSuccess: cout << "cudaSuccess";
+	case cudaSuccess: printf("cudaSuccess");
 		break;
-	case cudaErrorInvalidValue: cout << "cudaErrorInvalidValue";
+	case cudaErrorInvalidValue: printf("cudaErrorInvalidValue");
 		break;
-	case cudaErrorInvalidDevicePointer: cout << "cudaErrorInvalidDevicePointer";
+	case cudaErrorInvalidDevicePointer: printf("cudaErrorInvalidDevicePointer");
 		break;
-	case cudaErrorInvalidMemcpyDirection: cout << "cudaErrorInvalidMemcpyDirection";
+	case cudaErrorInvalidMemcpyDirection: printf("cudaErrorInvalidMemcpyDirection");
 		break;
 	}
 }
