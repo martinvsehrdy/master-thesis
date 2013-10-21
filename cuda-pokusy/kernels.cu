@@ -1,15 +1,14 @@
 #include <stdio.h>
 #include <cstdio>
+#include <math.h>
 #include <cuda.h>
 #include <cuda_runtime.h>
+#include <cuda_profiler_api.h>
 #include "kernels.h"
 #include "time_measure.h"
+#include "common.h"
 
 
-//#define S_DELENIM
-#define COPY_MAT_B_GLOB_TO_A_SH	1
-#define COPY_MAT_A_SH_TO_B_GLOB	2
-#define COPY_MAT_A_SH_TO_B_SH 	3
 
 __device__ int cuda_get_index(int X, int Y, int N)	// SLOUPEC, RADEK
 {
@@ -159,7 +158,7 @@ __device__ void cuda_copy_podmatice(int N, int sx, int sy, int Sx, int Sy, unsig
  * dva pristupy k matici: ipivot prochazi pres matici pres radky/sloupce
  * void gauss_jordan_elim_while(int Sx, int Sy, unsigned int modul, unsigned int* m_matice)
  */
-__device__ void gauss_jordan_elim_while_kernel(int Sx, int Sy, unsigned int modul, unsigned int* m_matice)
+__device__ void gauss_jordan_elim_while_kernel(int Sx, int Sy, unsigned int modul, unsigned int* m_matice, unsigned int zpusob)
 {
 	// TODO: posouvat cisla v radcich doleva, kvuli CUDA, aby se pristupovalo stale na ty stejna mista v pameti, 
 	//       vysledek bude v prvnim sloupci matice
@@ -214,79 +213,91 @@ __device__ void gauss_jordan_elim_while_kernel(int Sx, int Sy, unsigned int modu
 		}
 
 		__syncthreads();
-#ifdef S_DELENIM
-		unsigned int a_pp_inv = cuda_compute_inverse_eukleides(m_matice[cuda_get_index(ipivot, ipivot, Sx)], modul);
-		// vydelit cely ipivot-ty radek cislem a_pp
-		itid=tid;
-		while(itid<Sx)
+		unsigned int a_pp;
+		if( zpusob & ZPUSOB_S_DELENIM )
 		{
-			unsigned long long pom = m_matice[cuda_get_index(itid, ipivot, Sx)];
-			pom *= a_pp_inv;
-			pom %= modul;
-			m_matice[cuda_get_index(itid, ipivot, Sx)]=(unsigned int)pom;
-
-			itid+=bdim;
-		}
-#else
-		unsigned int a_pp = m_matice[cuda_get_index(ipivot, ipivot, Sx)];
-#endif
-
-		 /*
-		itid=tid;
-		while(itid<Sy)	// prochazi jednotlive radky
-		{
-			if(itid!=ipivot)
+			unsigned int a_pp_inv = cuda_compute_inverse_eukleides(m_matice[cuda_get_index(ipivot, ipivot, Sx)], modul);
+			// vydelit cely ipivot-ty radek cislem a_pp
+			itid=tid;
+			while(itid<Sx)
 			{
-				unsigned int a_py = m_matice[cuda_get_index(ipivot, itid, Sx)];
+				unsigned long long pom = m_matice[cuda_get_index(itid, ipivot, Sx)];
+				pom *= a_pp_inv;
+				pom %= modul;
+				m_matice[cuda_get_index(itid, ipivot, Sx)]=(unsigned int)pom;
 
-				for(int iX=0;iX<Sx;iX++)	// prochazi cisla v i1-tem radku
-				{
-					unsigned int a_xy = m_matice[cuda_get_index(iX, itid, Sx)];
-					unsigned int a_xp = m_matice[cuda_get_index(iX, ipivot, Sx)];
-#ifdef S_DELENIM
-					m_matice[cuda_get_index(iX, itid, Sx)] = cuda_elem_uprava_s_delenim(modul, a_xy, a_xp, a_py);
-#else
-					m_matice[cuda_get_index(iX, itid, Sx)] = cuda_elem_uprava_bez_deleni(modul, a_xy, a_pp, a_xp, a_py);
-#endif
-				}
+				itid+=bdim;
 			}
-			itid+=bdim;
-		}
-		/*/
-		for(int iY=0;iY<Sy;iY++)	// prochazi jednotlive radky
+		}else
 		{
-			if(iY!=ipivot)
+			a_pp = m_matice[cuda_get_index(ipivot, ipivot, Sx)];
+		}
+
+		//*
+		if(zpusob & ZPUSOB_WF)
+		{
+			itid=tid;
+			while(itid<Sy)	// prochazi jednotlive radky
 			{
-				unsigned int a_py = m_matice[cuda_get_index(ipivot, iY, Sx)];
-				// DEBUG
-				itid=tid;
-				while(itid<Sx)	// prochazi cisla v i1-tem radku
+				if(itid!=ipivot)
 				{
-					unsigned int a_xy = m_matice[cuda_get_index(itid, iY, Sx)];
-					unsigned int a_xp = m_matice[cuda_get_index(itid, ipivot, Sx)];
-#ifdef S_DELENIM
-					m_matice[cuda_get_index(itid, iY, Sx)] = cuda_elem_uprava_s_delenim(modul, a_xy, a_xp, a_py);
-#else
-					m_matice[cuda_get_index(itid, iY, Sx)] = cuda_elem_uprava_bez_deleni(modul, a_xy, a_pp, a_xp, a_py);
-#endif
-					itid+=bdim;
+					unsigned int a_py = m_matice[cuda_get_index(ipivot, itid, Sx)];
+
+					for(int iX=0;iX<Sx;iX++)	// prochazi cisla v i1-tem radku
+					{
+						unsigned int a_xy = m_matice[cuda_get_index(iX, itid, Sx)];
+						unsigned int a_xp = m_matice[cuda_get_index(iX, ipivot, Sx)];
+						if( zpusob & ZPUSOB_S_DELENIM )
+						{
+							m_matice[cuda_get_index(iX, itid, Sx)] = cuda_elem_uprava_s_delenim(modul, a_xy, a_xp, a_py);
+						}else
+						{
+							m_matice[cuda_get_index(iX, itid, Sx)] = cuda_elem_uprava_bez_deleni(modul, a_xy, a_pp, a_xp, a_py);
+						}
+					}
 				}
+				itid+=bdim;
 			}
-			__syncthreads();
-		}//*/
+		}else
+		{
+			for(int iY=0;iY<Sy;iY++)	// prochazi jednotlive radky
+			{
+				if(iY!=ipivot)
+				{
+					unsigned int a_py = m_matice[cuda_get_index(ipivot, iY, Sx)];
+					// DEBUG
+					itid=tid;
+					while(itid<Sx)	// prochazi cisla v i1-tem radku
+					{
+						unsigned int a_xy = m_matice[cuda_get_index(itid, iY, Sx)];
+						unsigned int a_xp = m_matice[cuda_get_index(itid, ipivot, Sx)];
+						if( zpusob & ZPUSOB_S_DELENIM )
+						{
+							m_matice[cuda_get_index(itid, iY, Sx)] = cuda_elem_uprava_s_delenim(modul, a_xy, a_xp, a_py);
+						}else
+						{
+							m_matice[cuda_get_index(itid, iY, Sx)] = cuda_elem_uprava_bez_deleni(modul, a_xy, a_pp, a_xp, a_py);
+						}
+						itid+=bdim;
+					}
+				}
+				__syncthreads();
+			}
+		}
 	}
-#ifndef S_DELENIM
-	unsigned long long pom;
-	itid=tid;
-	while(itid<Smin)
+	if( zpusob & ZPUSOB_S_DELENIM )
 	{
-		pom = m_matice[cuda_get_index(Sx-1, itid, Sx)];
-		pom *= cuda_compute_inverse_eukleides(m_matice[cuda_get_index(itid, itid, Sx)], modul);
-		pom %= modul;
-		m_matice[cuda_get_index(Sx-1, itid, Sx)] = (unsigned int)pom;
-		itid+=bdim;
+		unsigned long long pom;
+		itid=tid;
+		while(itid<Smin)
+		{
+			pom = m_matice[cuda_get_index(Sx-1, itid, Sx)];
+			pom *= cuda_compute_inverse_eukleides(m_matice[cuda_get_index(itid, itid, Sx)], modul);
+			pom %= modul;
+			m_matice[cuda_get_index(Sx-1, itid, Sx)] = (unsigned int)pom;
+			itid+=bdim;
+		}
 	}
-#endif
 }
 
 __global__ void kernel(int N, int* pole, int cislo)
@@ -298,40 +309,62 @@ __global__ void kernel(int N, int* pole, int cislo)
 		tid+=blockDim.x;
 	}
 }
-__global__ void cuda_GJE_podmatice(int N, int modul, unsigned int* g_matice, unsigned int* g_prava_strana)
+__global__ void cuda_GJE_podmatice(int N, int modul, unsigned int* g_matice, unsigned int* g_prava_strana, unsigned int zpusob)
 {
 	int Sx=N+1;
 	int Sy=N;
-	__shared__ unsigned int s_mat[4000];
+	__shared__ unsigned int s_mat[12240];	// N=110
 	cuda_copy_podmatice(N, 0, 0, Sx, Sy, s_mat, g_matice, g_prava_strana, COPY_MAT_B_GLOB_TO_A_SH);
-	gauss_jordan_elim_while_kernel(Sx, Sy, modul, s_mat);
+	gauss_jordan_elim_while_kernel(Sx, Sy, modul, s_mat, zpusob);
 	cuda_copy_podmatice(N, 0, 0, Sx, Sy, s_mat, g_matice, g_prava_strana, COPY_MAT_A_SH_TO_B_GLOB);
 }
-void cuda_GJE_while(int N, int modul, unsigned int* m_matice, unsigned int* m_prava_strana)
+void cuda_GJE_while(int N, int modul, unsigned int* m_matice, unsigned int* m_prava_strana, unsigned int zpusob)
 {
 	if(num_of_gpu<=0) return;
 	// TODO: dynamicky alokovana sdilena pamet
 	unsigned int *g_matice, *g_prava_strana;
+	cudaProfilerStart();
 	cudaMalloc((void**)&g_matice, (N*N)*sizeof(unsigned int));
 	cudaMalloc((void**)&g_prava_strana, N*sizeof(unsigned int));
 	cudaMemcpy(g_matice, m_matice, (N*N)*sizeof(unsigned int), cudaMemcpyHostToDevice);
 	cudaMemcpy(g_prava_strana, m_prava_strana, N*sizeof(unsigned int), cudaMemcpyHostToDevice);
-	unsigned int start_time=get_milisec_from_startup();
-	cuda_GJE_podmatice<<<1,32>>>(N, modul, g_matice, g_prava_strana);
+	cuda_start_measuring();
+	int num_of_threads;
+	switch( ((zpusob & ZPUSOB_VLAKNA) >> 2) )
+	{
+	case 0:
+		num_of_threads=1;
+		break;
+	case 1:
+		num_of_threads=32;
+		break;
+	case 2:
+		num_of_threads=128;
+		break;
+	}
+	//num_of_threads = min( ceil((float)(N+1)/32.0)*32, num_of_threads );
+	cuda_GJE_podmatice<<<1,num_of_threads>>>(N, modul, g_matice, g_prava_strana, zpusob);
 	cudaThreadSynchronize();
-	gpu_time=(get_milisec_from_startup()-start_time);
+	cuda_stop_measuring();
+
 	cudaMemcpy(m_matice, g_matice, (N*N)*sizeof(unsigned int), cudaMemcpyDeviceToHost);
 	cudaMemcpy(m_prava_strana, g_prava_strana, N*sizeof(unsigned int), cudaMemcpyDeviceToHost);
 	cudaFree(g_matice);
 	cudaFree(g_prava_strana);
 
+	cudaProfilerStop();
 }
 
 void init_gpu_compute(void)
 {
+	extern cudaEvent_t cuda_start;
+	extern cudaEvent_t cuda_stop;
 	num_of_gpu=0;
     cudaGetDeviceCount( &num_of_gpu);
 	if (0<num_of_gpu) cudaGetDeviceProperties( &gpu_property, 0);
+	cudaEventCreate(&cuda_start);
+	cudaEventCreate(&cuda_stop);
+	//cudaProfilerInitialize
 }
 void print_gpus_info(void)
 {

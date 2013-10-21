@@ -3,10 +3,10 @@
 #include "templates_functions.h"
 #include <cstdio>
 #include "time_measure.h"
+#include "common.h"
 
 using namespace std;
 
-//#define S_DELENIM
 
 // elementarni uprava s delenim
 unsigned int elem_uprava_s_delenim(unsigned int modul, unsigned int a_xy, unsigned int a_xp, unsigned int a_py)
@@ -59,9 +59,10 @@ unsigned int elem_uprava_bez_deleni(unsigned int modul, unsigned int a_xy, unsig
  * gauss-jordanova eliminace, jednovlaknova, ve for-cyklech, primo na datech ve vstupnim poli, 
  * bez deleni - nasobim oba mergujici radky, po vypoctu kazde bunky se moduluje
  */
-void gauss_jordan_elim_for(int N, int modul, unsigned int* m_matice, unsigned int* m_prava_strana, unsigned int* m_vys_jmenovatel)
+void gauss_jordan_elim_for(int N, int modul, unsigned int* m_matice, unsigned int* m_prava_strana, unsigned int zpusob)
 {
-	unsigned int start_time = get_milisec_from_startup();
+	//unsigned int start_time = get_milisec_from_startup();
+	start_measuring();
 	for(int ipivot=0;ipivot<N;ipivot++)
 	{
 		//cout << ipivot << endl;
@@ -94,32 +95,33 @@ void gauss_jordan_elim_for(int N, int modul, unsigned int* m_matice, unsigned in
 				for(int i=0;i<N;i++)	// singularni matice => vysledky jsou nulove (nepouzitelne)
 				{
 					m_prava_strana[i]=0;
-					if(m_vys_jmenovatel!=NULL) m_vys_jmenovatel[i]=1;
 				}
 				return;
 			}
 		}
-#ifdef S_DELENIM
-		unsigned int a_pp_inv = compute_inverse(m_matice[get_index(ipivot, ipivot, N)], modul);
-		//cout << endl << "vydelit " << a_pp_inv << ": ";
-		// vydelit cely ipivot-ty radek cislem a_pp
-		unsigned long long pom;
-		for(int iX=0;iX<N;iX++)
+		unsigned int a_pp;
+		if( zpusob & ZPUSOB_S_DELENIM )
 		{
-			pom = m_matice[get_index(iX, ipivot, N)];
+			unsigned int a_pp_inv = compute_inverse_eukleides(m_matice[get_index(ipivot, ipivot, N)], modul);
+			//cout << endl << "vydelit " << a_pp_inv << ": ";
+			// vydelit cely ipivot-ty radek cislem a_pp
+			unsigned long long pom;
+			for(int iX=0;iX<N;iX++)
+			{
+				pom = m_matice[get_index(iX, ipivot, N)];
+				pom *= a_pp_inv;
+				pom %= modul;
+				m_matice[get_index(iX, ipivot, N)]=(unsigned int)pom;
+			}
+			pom = m_prava_strana[ipivot];
 			pom *= a_pp_inv;
 			pom %= modul;
-			m_matice[get_index(iX, ipivot, N)]=(unsigned int)pom;
+			m_prava_strana[ipivot]=(unsigned int)pom;
+		}else
+		{
+			a_pp = m_matice[get_index(ipivot, ipivot, N)];
 		}
-		pom = m_prava_strana[ipivot];
-		pom *= a_pp_inv;
-		pom %= modul;
-		m_prava_strana[ipivot]=(unsigned int)pom;
 
-#else
-		unsigned int a_pp = m_matice[get_index(ipivot, ipivot, N)];
-		//cout << endl << a_pp << ": ";
-#endif
 		for(int iY=0;iY<N;iY++)	// prochazi jednotlive radky
 		{
 			if(iY==ipivot) continue;
@@ -129,36 +131,40 @@ void gauss_jordan_elim_for(int N, int modul, unsigned int* m_matice, unsigned in
 			{
 				unsigned int a_xy = m_matice[get_index(iX, iY, N)];
 				unsigned int a_xp = m_matice[get_index(iX, ipivot, N)];
-#ifdef S_DELENIM
-				m_matice[get_index(iX, iY, N)]=elem_uprava_s_delenim(modul, a_xy, a_xp, a_py);
-#else
-				m_matice[get_index(iX, iY, N)]=elem_uprava_bez_deleni(modul, a_xy, a_pp, a_xp, a_py);
-#endif
+				if( zpusob & ZPUSOB_S_DELENIM )
+				{
+					m_matice[get_index(iX, iY, N)]=elem_uprava_s_delenim(modul, a_xy, a_xp, a_py);
+				}else
+				{
+					m_matice[get_index(iX, iY, N)]=elem_uprava_bez_deleni(modul, a_xy, a_pp, a_xp, a_py);
+				}
 
 			}
-#ifdef S_DELENIM
-			m_prava_strana[iY]=elem_uprava_s_delenim(modul, m_prava_strana[iY], m_prava_strana[ipivot], a_py);
-#else
-			m_prava_strana[iY]=elem_uprava_bez_deleni(modul, m_prava_strana[iY], a_pp, m_prava_strana[ipivot], a_py);
-#endif
-
+			if( zpusob & ZPUSOB_S_DELENIM )
+			{
+				m_prava_strana[iY]=elem_uprava_s_delenim(modul, m_prava_strana[iY], m_prava_strana[ipivot], a_py);
+			}else
+			{
+				m_prava_strana[iY]=elem_uprava_bez_deleni(modul, m_prava_strana[iY], a_pp, m_prava_strana[ipivot], a_py);
+			}
 		}
 		//cout << "pivot: " << ipivot << endl;
 		//vypsat_matlab(N, m_matice, m_prava_strana);
 		//vypsat_mat(N, N, m_matice, m_prava_strana);
 		//cout << endl;
 	}
-#ifndef S_DELENIM
-	unsigned long long pom;
-	for(int i=0;i<N;i++)
+	if( !(zpusob & ZPUSOB_S_DELENIM) )
 	{
-		pom = m_prava_strana[i];
-		pom *= compute_inverse(m_matice[get_index(i, i, N)], modul);
-		pom %= modul;
-		m_prava_strana[i] = (unsigned int)pom;
+		unsigned long long pom;
+		for(int i=0;i<N;i++)
+		{
+			pom = m_prava_strana[i];
+			pom *= compute_inverse_eukleides(m_matice[get_index(i, i, N)], modul);
+			pom %= modul;
+			m_prava_strana[i] = (unsigned int)pom;
+		}
 	}
-#endif
-	measured_time = get_milisec_from_startup() - start_time;
+	stop_measuring();
 }
 /* 
  * gauss-jordanova eliminace, jednovlaknova, ve while-cyklech, primo na datech ve vstupnim poli, 
@@ -224,7 +230,7 @@ void gauss_jordan_elim_while(int Sx, int Sy, unsigned int modul, unsigned int* m
 
 		// CUDA: __syncthreads();
 #ifdef S_DELENIM
-		unsigned int a_pp_inv = compute_inverse(m_matice[get_index(ipivot, ipivot, Sx)], modul);
+		unsigned int a_pp_inv = compute_inverse_eukleides(m_matice[get_index(ipivot, ipivot, Sx)], modul);
 		cout << endl << "vydelit " << a_pp_inv << ": ";
 		// vydelit cely ipivot-ty radek cislem a_pp
 		itid=tid;
@@ -295,7 +301,7 @@ void gauss_jordan_elim_while(int Sx, int Sy, unsigned int modul, unsigned int* m
 	for(int i=0;i<Smin;i++)
 	{
 		pom = m_matice[get_index(Sx-1, i, Sx)];
-		pom *= compute_inverse(m_matice[get_index(i, i, Sx)], modul);
+		pom *= compute_inverse_eukleides(m_matice[get_index(i, i, Sx)], modul);
 		pom %= modul;
 		m_matice[get_index(Sx-1, i, Sx)] = (unsigned int)pom;
 	}
@@ -410,7 +416,7 @@ void compute_podmatice1(int N, unsigned int modul, int sx, int sy, int Sx, int S
 		}
 		// \STATE \COMMENT {vydelit celý $p$-tý rádek císlem $a_{pp}$, v $p$-tém sloupci na diagonále bude císlo 1}
 		// \STATE uložit "jedna lomeno  $a_{pp}$" do $actions$
-		m1=compute_inverse(s_mat[get_index(ipivot, ipivot, Sx)], modul);
+		m1=compute_inverse_eukleides(s_mat[get_index(ipivot, ipivot, Sx)], modul);
 		actions[minS+ipivot]=m1;
 		cout << " | vydelit " << m1;
 		// \FOR{$x$ := $p$ do $N$}
@@ -631,7 +637,7 @@ void compute_podmatice13(int N, unsigned int modul, int sx, int sy, int Sx, int 
 			// \STATE $(isloupec, sdiagy)$ := souradnice diagonalniho prvku
 				sdiagy=gdiagx-Sy*sy;
 			// \STATE \COMMENT {vydelit cely $sdiagy$-ty radek cislem $a_{isloupec sdiagy}$, v $isloupec$-tem sloupci na diagonale bude cislo 1}
-				m1=compute_inverse(s_mat[get_index(isloupec, sdiagy, Sx)], modul);
+				m1=compute_inverse_eukleides(s_mat[get_index(isloupec, sdiagy, Sx)], modul);
 				cout << endl << "vydelit " << s_mat[get_index(isloupec, sdiagy, Sx)] << " ~ vynasobit " << m1 << endl;
 				int index_actions=minS+Sy*isloupec;
 				actions[index_actions]=m1;

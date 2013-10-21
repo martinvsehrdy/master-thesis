@@ -12,7 +12,7 @@ void print_gpus_info(void);
 void print_cuda_err(cudaError_t cudaErr);
 void init_gpu_compute(void);
 
-void cuda_GJE_while(int N, int modul, unsigned int* m_matice, unsigned int* m_prava_strana);
+void cuda_GJE_while(int N, int modul, unsigned int* m_matice, unsigned int* m_prava_strana, unsigned int zpusob);
 
 
 #endif /* _KERNELS_CU_ */

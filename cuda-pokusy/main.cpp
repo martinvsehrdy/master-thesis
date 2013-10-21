@@ -7,11 +7,13 @@
 #include "templates_functions.h"
 #include "kernels.h"
 #include "time_measure.h"
+#include "common.h"
+#include <Windows.h>
 
 using namespace std;
 
 #define POC_OPAKOVANI 10
-float cuda_time1, cuda_time2, cuda_time3;
+//extern unsigned int measured_time;
 
 void statistic(list<float> l, float* quartal1, float* quartal2, float* quartal3, float* avg)
 {
@@ -64,11 +66,10 @@ void statistic(list<float> l, float* quartal1, float* quartal2, float* quartal3,
 int main(int argc, char** argv)
 // argv[0] <N> <modul>
 {
-	int N=8;
+	int N=87;
 	unsigned int modul=0x10000003; //(~(unsigned int)0);
-	modul |= rand();
-	modul = 0x1003;	// 4099 je prvocislo
-	cout << "Modul = " << modul << endl;
+	//modul = 0x1003;	// 4099 je prvocislo
+	/*cout << "Modul = " << modul << endl;
 	unsigned int* M=new unsigned int[N*N];
 	unsigned int* P=new unsigned int[N];
 	hilbert_matrix(N, M, P);
@@ -78,6 +79,7 @@ int main(int argc, char** argv)
 #ifdef _DEBUG
 	cin.get();
 #endif
+	return 0; */
 	////////////////////////////////////////////////////////
 	int zpusob=0;
 	if(argc>2)
@@ -87,10 +89,12 @@ int main(int argc, char** argv)
 	}else
 	{
 		cout << "#Program spustte ve tvaru:" << argv[0] << " <N> <zpusob zpracovani>" << endl;
-		cout << "zpusob zpracovani: 1 - na CPU s delenim" << endl;
-		cout << "                   2 - na CPU bez deleni" << endl;
-		cout << "                   3 - na GPU s deleni" << endl;
-		cout << "                   4 - na GPU bez deleni" << endl;
+		cout << "#zpusob zpracovani: 0. bit \tfor/while(0) while/for(1)" << endl;
+		cout << "#                   1. bit \tbez deleni(0) s delenim(1)" << endl;
+		cout << "#                   2.3.bit \t1(00) 32(01) 128(10) vlaken" << endl;
+		cout << "#                   4.bit \tGPU(0) CPU(1)" << endl;
+
+
 		cout << "#Vystup: <velikost N> <na GPU [ms]>\t<z GPU [ms]>\tprumer\tnejrychlejsi\t1.quartal\tmedian\t3.quartal\tnejpomalejsi\t<celkem [ms]>" << endl;
 		return 0;
 	}
@@ -98,28 +102,43 @@ int main(int argc, char** argv)
 	unsigned int* A=new unsigned int[N*N];
 	unsigned int* b=new unsigned int[N];
 
+#ifndef _DEBUG
+	list<float> times;
+	times.clear();
+	float sum=0.0;
+	for(int i=0;i<POC_OPAKOVANI;i++)
+	{
+#endif
 	hilbert_matrix<unsigned int>(N, A, b);
 #ifdef _DEBUG
 	vypsat_mat<unsigned int>(N, N, A, b);
 #endif
-
-	switch(zpusob)
+	float tt=0;
+	if(zpusob & ZPUSOB_CPU)
 	{
-	case 1:
-		gauss_jordan_elim_for(N, modul, A, b, NULL);
-		break;
-	case 2:
-		gauss_jordan_elim_for(N, modul, A, b, NULL);
-		break;
-	case 3:
-		cuda_GJE_while(N, modul, A, b);
-		break;
-	case 4:
-		cuda_GJE_while(N, modul, A, b);
-		break;
+		gauss_jordan_elim_for(N, modul, A, b, zpusob);
+		tt = get_measured_time();
+	}else
+	{
+		init_gpu_compute();
+		cuda_GJE_while(N, modul, A, b, zpusob);
+		tt = cuda_get_measured_time();
 	}
-	cout << measured_time;
-
+#ifndef _DEBUG
+	times.push_back(tt);
+	sum += tt;
+	if( !(zpusob & ZPUSOB_CPU) ) cudaDeviceReset();
+	Sleep(100);
+	}
+	float q1, q2, q3, prumer;
+	statistic(times, &q1, &q2, &q3, &prumer);
+	times.sort();
+	//<velikost N> <na GPU [ms]>\t<z GPU [ms]>\tprumer\tnejrychlejsi\t1.quartal\tmedian\t3.quartal\tnejpomalejsi\t<celkem [ms]>
+	cout << N << "\t?\t?\t" << prumer << "\t" << times.front() << "\t" << q1 << "\t" << q2 << "\t" << q3 << "\t" << times.back() << "\t" << sum << endl;
+#else
+	cout << tt;
+#endif
+	//vypsat_mat<unsigned int>(N, N, A, b);
 #ifdef _DEBUG
 	vypsat_mat<unsigned int>(N, N, A, b);
 	cout << "===================================================" << endl;
