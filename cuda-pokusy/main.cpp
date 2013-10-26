@@ -66,20 +66,38 @@ void statistic(list<float> l, float* quartal1, float* quartal2, float* quartal3,
 int main(int argc, char** argv)
 // argv[0] <N> <modul>
 {
-	int N=87;
+	int N=3;
 	unsigned int modul=0x10000003; //(~(unsigned int)0);
-	//modul = 0x1003;	// 4099 je prvocislo
-	/*cout << "Modul = " << modul << endl;
+	modul = 0x1003;	// 4099 je prvocislo
+	modul = 1000;
+	cout << "Modul = " << modul << endl;
 	unsigned int* M=new unsigned int[N*N];
 	unsigned int* P=new unsigned int[N];
+	for(int y=0;y<N;y++)
+	{
+		for(int x=0;x<N;x++)
+		{
+			M[get_index(x, y, N)]=10*x+y;
+		}
+		P[y]=800+y;
+	}
+
+	hilbert_matrix(N, M, P);
+	gauss_jordan_elim_for(N, modul, M, P, 16);
+	save_matrix(N, M, P, "outmat-for");
+
 	hilbert_matrix(N, M, P);
 	vypsat_mat(N, N, M, P);
-	GJE_podmatice(N, modul, M, P, NULL);
+	GJE_podmatice(N, modul, M, P, NULL, 16);
 	vypsat_mat(N, N, M, P);
+	save_matrix(N, M, P, "outmat-GJE");
 #ifdef _DEBUG
 	cin.get();
+#else
+	delete M;
+	delete P;
 #endif
-	return 0; */
+	return 0; /*/
 	////////////////////////////////////////////////////////
 	int zpusob=0;
 	if(argc>2)
@@ -109,26 +127,26 @@ int main(int argc, char** argv)
 	for(int i=0;i<POC_OPAKOVANI;i++)
 	{
 #endif
-	hilbert_matrix<unsigned int>(N, A, b);
+		hilbert_matrix<unsigned int>(N, A, b);
 #ifdef _DEBUG
 	vypsat_mat<unsigned int>(N, N, A, b);
 #endif
-	float tt=0;
-	if(zpusob & ZPUSOB_CPU)
-	{
-		gauss_jordan_elim_for(N, modul, A, b, zpusob);
-		tt = get_measured_time();
-	}else
-	{
-		init_gpu_compute();
-		cuda_GJE_while(N, modul, A, b, zpusob);
-		tt = cuda_get_measured_time();
-	}
+		float tt=0;
+		if(zpusob & ZPUSOB_CPU)
+		{
+			gauss_jordan_elim_for(N, modul, A, b, zpusob);
+			tt = get_measured_time();
+		}else
+		{
+			init_gpu_compute();
+			cuda_GJE_while(N, modul, A, b, zpusob);
+			tt = cuda_get_measured_time();
+		}
 #ifndef _DEBUG
-	times.push_back(tt);
-	sum += tt;
-	if( !(zpusob & ZPUSOB_CPU) ) cudaDeviceReset();
-	Sleep(100);
+		times.push_back(tt);
+		sum += tt;
+		if( !(zpusob & ZPUSOB_CPU) ) cudaDeviceReset();
+		Sleep(100);
 	}
 	float q1, q2, q3, prumer;
 	statistic(times, &q1, &q2, &q3, &prumer);
@@ -152,4 +170,5 @@ int main(int argc, char** argv)
 	free(A);
 	free(b);
 	return 0;
+	*/
 }

@@ -2,6 +2,7 @@
 #define _TEMPLATES_FUNCTIONS_H_
 #include <iostream>
 #include <fstream>
+#include <stdio.h>
 #include "kernels_cpu.h"
 
 template<class TYPE>
@@ -12,7 +13,7 @@ void hilbert_matrix(int N, TYPE* matice, TYPE* prava_strana)
 	{
 		for(int x=0;x<N;x++)
 		{
-			a = (TYPE)(100.0/((double)(x+y+2)));
+			a = (TYPE)(10.0/((double)(x+y+2)));
 			matice[get_index(x, y, N)]=a;
 		}
 		prava_strana[y]=y+1;
@@ -61,6 +62,33 @@ int load_matrix(int* N, TYPE** matice, TYPE** prava_strana, char* filename)
 }
 
 template<class TYPE>
+int save_matrix(int N, TYPE* matice, TYPE* prava_strana, char* filename)
+{
+	fstream file;
+	file.open(filename, fstream::out);
+	if(!file.is_open()) return 1;
+	file << N << endl;
+	
+	for(int y=0;y<N;y++)
+	{
+		int x;
+		for(x=0;x<N;x++)
+		{
+			file << matice[get_index(x, y, N)] << "\t";
+			//printf("%8u\t", matice[get_index(x, y, nx)]);
+		}
+		if(prava_strana!=NULL)
+		{
+			file << "| " << prava_strana[y];
+		}
+		file << "\n";
+	}
+
+	file.close();
+	return 0;
+}
+
+template<class TYPE>
 void vypsat_mat(int nx, int ny, TYPE* matice, TYPE* prava_strana)
 {
 	cout << endl;
@@ -69,8 +97,9 @@ void vypsat_mat(int nx, int ny, TYPE* matice, TYPE* prava_strana)
 		int x;
 		for(x=0;x<min(nx,8);x++)
 		{
-			cout.precision(5);
-			cout << matice[get_index(x, y, max(nx, ny))] << "\t";
+			cout.precision(8);
+			cout << matice[get_index(x, y, nx)] << "\t";
+			//printf("%8u\t", matice[get_index(x, y, nx)]);
 		}
 		if(x<nx-1) cout << "...";
 		cout << "| ";
@@ -88,7 +117,7 @@ void vypsat_matlab(int nx, int ny, TYPE* matice, TYPE* prava_strana)
 		int x;
 		for(x=0;x<nx;x++)
 		{
-			cout << matice[get_index(x, y, max(nx, ny))];
+			cout << matice[get_index(x, y, nx)];
 			if(x<nx-1) cout << ",";
 		}
 		if(y<ny-1) cout << ";";

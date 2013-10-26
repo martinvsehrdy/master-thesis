@@ -9,6 +9,7 @@
 #define ZPUSOB_S_DELENIM	0x0002	// 1. bit bez deleni(0) s delenim(1)
 #define ZPUSOB_VLAKNA		0x000C	// 2.3.bit \t1(00) 32(01) 128(10) vláken
 #define ZPUSOB_CPU			0x0010	// 4.bit \tGPU(0) CPU(1)
+#define PODMATICE_12		0x8000	// 15.bit rezervovan na rozliseni podmatice12 a 34
 
 
 #endif /* _COMMON_H_ */
