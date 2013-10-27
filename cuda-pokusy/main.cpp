@@ -66,10 +66,9 @@ void statistic(list<float> l, float* quartal1, float* quartal2, float* quartal3,
 int main(int argc, char** argv)
 // argv[0] <N> <modul>
 {
-	int N=3;
+	int N=10;
 	unsigned int modul=0x10000003; //(~(unsigned int)0);
 	modul = 0x1003;	// 4099 je prvocislo
-	modul = 1000;
 	cout << "Modul = " << modul << endl;
 	unsigned int* M=new unsigned int[N*N];
 	unsigned int* P=new unsigned int[N];
@@ -83,12 +82,12 @@ int main(int argc, char** argv)
 	}
 
 	hilbert_matrix(N, M, P);
-	gauss_jordan_elim_for(N, modul, M, P, 16);
+	gauss_jordan_elim_for(N, modul, M, P, 18);
 	save_matrix(N, M, P, "outmat-for");
 
 	hilbert_matrix(N, M, P);
 	vypsat_mat(N, N, M, P);
-	GJE_podmatice(N, modul, M, P, NULL, 16);
+	GJE_podmatice(N, modul, M, P, NULL, 18);
 	vypsat_mat(N, N, M, P);
 	save_matrix(N, M, P, "outmat-GJE");
 #ifdef _DEBUG
