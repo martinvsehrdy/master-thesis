@@ -66,20 +66,14 @@ void statistic(list<float> l, float* quartal1, float* quartal2, float* quartal3,
 int main(int argc, char** argv)
 // argv[0] <N> <modul>
 {
-	int N=10;
+	int N=20;
 	unsigned int modul=0x10000003; //(~(unsigned int)0);
 	modul = 0x1003;	// 4099 je prvocislo
 	cout << "Modul = " << modul << endl;
 	unsigned int* M=new unsigned int[N*N];
 	unsigned int* P=new unsigned int[N];
-	for(int y=0;y<N;y++)
-	{
-		for(int x=0;x<N;x++)
-		{
-			M[get_index(x, y, N)]=10*x+y;
-		}
-		P[y]=800+y;
-	}
+	for(int y=0;y<N;y++) for(int x=0;x<N;x++) M[get_index(x, y, N)]=10*x+y;
+	for(int y=0;y<N;y++) P[y]=800+y;
 
 	hilbert_matrix(N, M, P);
 	gauss_jordan_elim_for(N, modul, M, P, 18);
@@ -88,13 +82,14 @@ int main(int argc, char** argv)
 	hilbert_matrix(N, M, P);
 	vypsat_mat(N, N, M, P);
 	GJE_podmatice(N, modul, M, P, NULL, 18);
-	vypsat_mat(N, N, M, P);
 	save_matrix(N, M, P, "outmat-GJE");
+	vypsat_mat(N, N, M, P);
+	
+	delete M;
+	delete P;
 #ifdef _DEBUG
 	cin.get();
 #else
-	delete M;
-	delete P;
 #endif
 	return 0; /*/
 	////////////////////////////////////////////////////////

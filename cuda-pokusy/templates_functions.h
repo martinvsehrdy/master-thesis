@@ -9,11 +9,12 @@ template<class TYPE>
 void hilbert_matrix(int N, TYPE* matice, TYPE* prava_strana)
 {
 	TYPE a;
+	double zaklad = pow(10.0,1+ceil(log10((double)N)));
 	for(int y=0;y<N;y++)
 	{
 		for(int x=0;x<N;x++)
 		{
-			a = (TYPE)(10.0/((double)(x+y+2)));
+			a = (TYPE)(zaklad/((double)(x+y+2)));
 			matice[get_index(x, y, N)]=a;
 		}
 		prava_strana[y]=y+1;
@@ -64,47 +65,63 @@ int load_matrix(int* N, TYPE** matice, TYPE** prava_strana, char* filename)
 template<class TYPE>
 int save_matrix(int N, TYPE* matice, TYPE* prava_strana, char* filename)
 {
-	fstream file;
+	/*fstream file;
 	file.open(filename, fstream::out);
-	if(!file.is_open()) return 1;
-	file << N << endl;
+	if(!file.is_open()) return 1;*/
+	FILE* f=fopen(filename, "w");
+	//file << N << endl;
+	fprintf(f, "%d\n", N);
 	
 	for(int y=0;y<N;y++)
 	{
 		int x;
 		for(x=0;x<N;x++)
 		{
-			file << matice[get_index(x, y, N)] << "\t";
-			//printf("%8u\t", matice[get_index(x, y, nx)]);
+			//file << matice[get_index(x, y, N)] << "\t";
+			fprintf(f, "%8u\t", matice[get_index(x, y, N)]);
 		}
 		if(prava_strana!=NULL)
 		{
-			file << "| " << prava_strana[y];
+			//file << "| " << prava_strana[y];
+			fprintf(f, "| %u", prava_strana[y]);
 		}
-		file << "\n";
+		//file << endl;
+		fprintf(f, "\n");
 	}
-
-	file.close();
+	//file.close();
+	fclose(f);
 	return 0;
 }
 
 template<class TYPE>
 void vypsat_mat(int nx, int ny, TYPE* matice, TYPE* prava_strana)
 {
-	cout << endl;
+	//cout << endl;
+	printf("\n");
 	for(int y=0;y<min(ny,12);y++)
 	{
 		int x;
 		for(x=0;x<min(nx,8);x++)
 		{
-			cout.precision(8);
-			cout << matice[get_index(x, y, nx)] << "\t";
-			//printf("%8u\t", matice[get_index(x, y, nx)]);
+			TYPE a=matice[get_index(x, y, nx)];
+			//cout.precision(8);
+			//cout << a << "\t";
+			printf("%6u\t", a);
 		}
-		if(x<nx-1) cout << "...";
-		cout << "| ";
-		if(prava_strana!=NULL) cout << prava_strana[y];
-		cout << endl;
+		if(x<nx-1)
+		{
+			//cout << "...";
+			printf("...");
+		}
+		//cout << "| ";
+		printf("| ");
+		if(prava_strana!=NULL)
+		{
+			//cout << prava_strana[y];
+			printf("%u", prava_strana[y]);
+		}
+		//cout << endl;
+		printf("\n");
 	}
 }
 
