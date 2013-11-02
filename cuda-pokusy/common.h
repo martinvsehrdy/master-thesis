@@ -11,5 +11,12 @@
 #define ZPUSOB_CPU			0x0010	// 4.bit \tGPU(0) CPU(1)
 #define PODMATICE_12		0x8000	// 15.bit rezervovan na rozliseni podmatice12 a 34
 
+#ifndef min
+#define min(a,b)	(a<b ? a : b)
+#endif
+
+#ifndef max
+#define max(a,b)	(a>b ? a : b)
+#endif
 
 #endif /* _COMMON_H_ */

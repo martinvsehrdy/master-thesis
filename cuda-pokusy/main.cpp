@@ -97,7 +97,7 @@ int main(int argc, char** argv)
 	if(argc>2)
 	{
 		N=atoi(argv[1]);
-		zpusob=atoi(argv[2]);
+		zpusob=atoi(argv[2]);	// strtol(argv[2], NULL, 2);
 	}else
 	{
 		cout << "#Program spustte ve tvaru:" << argv[0] << " <N> <zpusob zpracovani>" << endl;

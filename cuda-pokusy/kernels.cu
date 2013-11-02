@@ -50,6 +50,7 @@ __device__ unsigned int cuda_compute_inverse_eukleides(unsigned int cislo, unsig
 // elementarni uprava s delenim
 __device__ unsigned int cuda_elem_uprava_s_delenim(unsigned int modul, unsigned int a_xy, unsigned int a_xp, unsigned int a_py)
 // \STATE $a_{xy} := a_{xy} - a_xp \cdot a_py$
+// TODO: merit rychlosti modulovani % a __umulhi
 {
 	unsigned long long m1;
 	unsigned long long pom;
@@ -160,8 +161,6 @@ __device__ void cuda_copy_podmatice(int N, int sx, int sy, int Sx, int Sy, unsig
  */
 __device__ void gauss_jordan_elim_while_kernel(int Sx, int Sy, unsigned int modul, unsigned int* m_matice, unsigned int zpusob)
 {
-	// TODO: posouvat cisla v radcich doleva, kvuli CUDA, aby se pristupovalo stale na ty stejna mista v pameti, 
-	//       vysledek bude v prvnim sloupci matice
 	int Smin=min(Sx, Sy);
 	int tid=threadIdx.x;
 	int bdim=blockDim.x;
@@ -309,19 +308,300 @@ __global__ void kernel(int N, int* pole, int cislo)
 		tid+=blockDim.x;
 	}
 }
-__global__ void cuda_GJE_podmatice(int N, int modul, unsigned int* g_matice, unsigned int* g_prava_strana, unsigned int zpusob)
+__global__ void cuda_GJE_while_kernel(int N, int modul, unsigned int* g_matice, unsigned int* g_prava_strana, unsigned int zpusob)
 {
 	int Sx=N+1;
 	int Sy=N;
-	__shared__ unsigned int s_mat[12240];	// N=110
+	extern __shared__ unsigned int shared_memory[];
+	unsigned int* s_mat=&(shared_memory[0]);
 	cuda_copy_podmatice(N, 0, 0, Sx, Sy, s_mat, g_matice, g_prava_strana, COPY_MAT_B_GLOB_TO_A_SH);
 	gauss_jordan_elim_while_kernel(Sx, Sy, modul, s_mat, zpusob);
 	cuda_copy_podmatice(N, 0, 0, Sx, Sy, s_mat, g_matice, g_prava_strana, COPY_MAT_A_SH_TO_B_GLOB);
 }
-void cuda_GJE_while(int N, int modul, unsigned int* m_matice, unsigned int* m_prava_strana, unsigned int zpusob)
+
+__device__ void cuda_compute_podmatice24(int N, unsigned int modul, int pivot_x, int Sx, int Sy, unsigned int* s_mat, unsigned int* actions, unsigned int zpusob)
+{
+	// podmatice s_mat: |-- podmatice, kterou pocitam (Sx*Sy cisel) --|
+	// podmatice p_mat: |-- podmatice, kterou potrebuji (az Sx^2 cisel) --|
+	int minS=min(Sx,Sy);
+	unsigned int* p_mat=&(s_mat[Sx*Sy]);
+	unsigned int* actions1=actions;				// indexy pivotnich radku, permutace radku, 'minS' cisel
+	unsigned int* actions2=&(actions1[minS]);	// cim vynasobit nebo vydelit pivotni radek; 'minS' cisel
+	unsigned int* actions3=&(actions2[minS]);	// multiplikatory, 'Sx*Sy' cisel
+	//cout << "modul = " << modul << endl;
+	int tid=threadIdx.x;
+	int bdim=blockDim.x;
+	// p_mat - pomocná podmatice, max velikost Sx*Sy
+	
+	for(int isloupec=0;(isloupec<minS);isloupec++)
+	{
+		unsigned int* pom_mat;
+		bool is_podm3;
+		__syncthreads();
+		if( (zpusob & PODMATICE_12) )
+		{
+			// podmatice2
+			pom_mat=s_mat;
+			is_podm3 = false;
+			// deleni: radek sdiag na '1'
+			if( zpusob & ZPUSOB_S_DELENIM )
+			{
+				unsigned int a_pp_inv=actions2[isloupec];
+				int x=tid;
+				while(x<Sx)
+				{
+					unsigned long long pom = s_mat[cuda_get_index(x, isloupec, Sx)];
+					pom *= a_pp_inv;
+					pom %= modul;
+					s_mat[cuda_get_index(x, isloupec, Sx)]=(unsigned int)pom;
+					x+=bdim;
+				}
+			}
+		}else
+		{
+			// podmatice4
+			pom_mat=p_mat;
+			is_podm3 = true;
+		}
+		// -------------------
+		unsigned int a_pp = actions2[isloupec];
+		__syncthreads();
+		int iY=tid;
+		while(iY<Sy)
+		{
+			if( is_podm3 || iY!=isloupec )	// neupravuji pivotni radek pokud je podmatice1
+			{
+				unsigned int a_py = actions3[isloupec*Sy+iY];
+				for(int iX=0;iX<Sx;iX++)
+				{
+					unsigned int a_xy = s_mat[cuda_get_index(iX, iY, Sx)];
+					unsigned int a_xp = pom_mat[cuda_get_index(iX, isloupec, Sx)];
+					//cout << "  " << a_xy << " * " << a_pp << " - " << a_xp << " * " << a_py << endl;
+					if(zpusob & ZPUSOB_S_DELENIM)
+					{
+						s_mat[cuda_get_index(iX, iY, Sx)] = cuda_elem_uprava_s_delenim(modul, a_xy, a_xp, a_py);
+					}else
+					{
+						s_mat[cuda_get_index(iX, iY, Sx)] = cuda_elem_uprava_bez_deleni(modul, a_xy, a_pp, a_xp, a_py);
+					}
+				}
+			}else
+			{
+			}
+			iY+=bdim;
+		}
+	}
+	
+}
+
+__device__ void cuda_compute_podmatice13(int N, unsigned int modul, int pivot_x, int Sx, int Sy, unsigned int* s_mat, unsigned int* actions, unsigned int zpusob)
+{
+	// podmatice s_mat: |-- podmatice, kterou pocitam (Sx*Sy cisel) --|
+	// podmatice p_mat: |-- podmatice, kterou potrebuji (az Sx^2 cisel) --|
+	int minS=min(Sx,Sy);
+	unsigned int* p_mat=&(s_mat[Sx*Sy]);
+	unsigned int* actions1=actions;				// indexy pivotnich radku, permutace radku, 'minS' cisel
+	unsigned int* actions2=&(actions1[minS]);	// cim vynasobit nebo vydelit pivotni radek; 'minS' cisel
+	unsigned int* actions3=&(actions2[minS]);	// multiplikatory, 'Sx*Sy' cisel
+
+	int tid=threadIdx.x;
+	int bdim=blockDim.x;
+	// p_mat - pomocná podmatice, max velikost Sx*Sy
+	
+// \FOR{$p$ := $1$ do $Sx$}
+	for(int isloupec=0;(isloupec<minS);isloupec++)
+	{
+		// najit g_diagonalu ve sloupci 'isloupec'
+		int gdiag=pivot_x+isloupec;
+		if(gdiag>=N) continue;
+		int sdiagy=isloupec;	// index pivotniho radku
+		unsigned int* pom_mat;
+		bool is_podm3;
+		// TODO: permutace radku, aby na diagonale nebyla nula
+		actions1[isloupec]=isloupec;
+		__syncthreads();
+		if( zpusob & PODMATICE_12 )	// diagonalni prvek je v 'isloupec'-tem sloupci v aktualni podmatici
+		{
+			// podmatice1
+			pom_mat=s_mat;
+			is_podm3 = false;
+			// deleni: radek sdiag na '1'
+			if( zpusob & ZPUSOB_S_DELENIM )
+			{
+				if(tid==0)
+				{
+					actions2[isloupec]=cuda_compute_inverse_eukleides(s_mat[cuda_get_index(isloupec, sdiagy, Sx)], modul);
+				}
+				__syncthreads();
+				unsigned int a_pp_inv=actions2[isloupec];
+				int x=tid;
+				while(x<Sx)
+				{
+					unsigned long long pom = s_mat[cuda_get_index(x, sdiagy, Sx)];
+					pom *= a_pp_inv;
+					pom %= modul;
+					s_mat[cuda_get_index(x, sdiagy, Sx)]=(unsigned int)pom;
+					x+=bdim;
+				}
+				
+			}
+		}else	// 'isloupec'-ty sloupec v podmatici je pod nebo nad diagonalnim prvkem
+		{
+			// podmatice3
+			pom_mat=p_mat;
+			is_podm3 = true;
+		}
+
+		//vypsat_mat<unsigned int>(Sx, Sy, s_mat, NULL);
+		// -------------------
+		if( tid==0 && !(zpusob & ZPUSOB_S_DELENIM) )
+		{
+			actions2[isloupec] = pom_mat[cuda_get_index(isloupec, sdiagy, Sx)];
+		}
+		unsigned int a_pp=1;
+		if( !(zpusob & ZPUSOB_S_DELENIM) )
+		{
+			__syncthreads();
+			a_pp=actions2[isloupec];
+		}
+		__syncthreads();
+		int iY=tid;
+		while(iY<Sy)
+		{
+			unsigned int a_py;
+			if( is_podm3 || iY!=sdiagy )	// neupravuji pivotni radek pokud je podmatice1
+			{
+				a_py = s_mat[cuda_get_index(isloupec, iY, Sx)];
+				// TODO: ulozit a_pp, a_py
+				actions3[isloupec*Sy+iY]=a_py;
+				//cout << "SAVE(" << a_pp << ", " << a_py << ")" << endl;
+				if(a_py!=0)	// TODO: tuhle podminku dat do podm24
+				{
+					for(int iX=0;iX<Sx;iX++)
+					{
+						unsigned int a_xy = s_mat[cuda_get_index(iX, iY, Sx)];
+						unsigned int a_xp = pom_mat[cuda_get_index(iX, sdiagy, Sx)];
+						//cout << "  " << a_xy << " * " << a_pp << " - " << a_xp << " * " << a_py << endl;
+						if(a_xp!=0)
+						{
+							if(zpusob & ZPUSOB_S_DELENIM)
+							{
+								s_mat[cuda_get_index(iX, iY, Sx)] = cuda_elem_uprava_s_delenim(modul, a_xy, a_xp, a_py);
+							}else
+							{
+								s_mat[cuda_get_index(iX, iY, Sx)] = cuda_elem_uprava_bez_deleni(modul, a_xy, a_pp, a_xp, a_py);
+							}
+						}
+					}
+				}
+			}else
+			{
+				actions3[isloupec*Sy+iY]=0;
+			}
+			iY+=bdim;
+		}
+		
+	}
+	//*/
+	
+}
+
+__global__ void cuda_GJE_podmatice_kernel(int N, int Sx, int Sy, unsigned int modul, unsigned int* m_matice, unsigned int* m_prava_strana, unsigned int zpusob)
+{
+	extern __shared__ unsigned int shared_memory[];
+	int Smin=min(Sx, Sy);
+	unsigned int* s_matice=&(shared_memory[0]);	// velikost Sx*(Sy+Sx)
+	unsigned int* actions=&(shared_memory[Sx*(Sy+Sx)]);	// velikost (Sx*Sy+2*Smin)
+
+// \FOR{$p$ := $1$ do $\lceil\frac{N}{\min(S_x, S_y)}\rceil$}
+	for(int ipivot=0;ipivot<N;ipivot+=Smin)
+	{
+	// \STATE \COMMENT{zpracovani radku, kde je Z=1}
+	// \STATE nacist a spocitat $podmatice_{pp}$ \COMMENT{Z=1}
+		int Py=ipivot;
+
+		cuda_copy_podmatice(N, ipivot, Py, Sx, Sy, s_matice, m_matice, m_prava_strana, COPY_MAT_B_GLOB_TO_A_SH);
+		// todo: compute_podmatice1
+		cuda_compute_podmatice13(N, modul, ipivot, Sx, Sy, s_matice, actions, zpusob | PODMATICE_12);
+		cuda_copy_podmatice(N, ipivot, Py, Sx, Sy, s_matice, m_matice, m_prava_strana, COPY_MAT_A_SH_TO_B_GLOB);
+	// \FOR{$x$ := $p+1$ do $\lceil\frac{N+1}{S_x}\rceil$}
+		for(int x=ipivot+Sx;x<N+1;x+=Sx)
+		{
+		// \STATE nacist a aplikovat operace v $actions$ na $podmatice_{xp}$ \COMMENT{Z=2}
+			cuda_copy_podmatice(N, x, Py, Sx, Sy, s_matice, m_matice, m_prava_strana, COPY_MAT_B_GLOB_TO_A_SH);
+			// todo: compute_podmatice2
+			cuda_compute_podmatice24(N, modul, x, Sx, Sy, s_matice, actions, zpusob | PODMATICE_12);
+			cuda_copy_podmatice(N, x, Py, Sx, Sy, s_matice, m_matice, m_prava_strana, COPY_MAT_A_SH_TO_B_GLOB);
+		}
+	//\ENDFOR
+	// \STATE \COMMENT{zpracovani ostatnich radku}
+	// \FOR{$y$ := $1$ do $\lceil\frac{N}{S_y}\rceil$}
+		for(int y=0;y<N;y+=Sy)
+		{
+		// \IF{$y$ != $p$}
+			//if(y!=Py)
+			{
+				// TODO: nacitani p_matice: 1) nacitat v jedne funkci spolu s s_matice (problem: rozlisovani kdy nacitat a kdy ne)
+				//                          2) nacitat ve fci copy_podmatice (nebo nejake spec. fci), problem s umistenim ve velke matici
+				// int Py=max(0, min(Sx, Sy*y-Sx*ipivot));
+				int Py1, Sy1=0;
+				int Py2, Sy2=0;
+				if(y+Sy<=ipivot)
+				{
+					// cela podmatice je nad diagonalou ve velke matici
+					Sy1=Sy;
+					Py1=y;
+				}else if(y<ipivot)
+				{
+					// cast bude nad a cast pod diagonalou
+					Sy1=ipivot-y;
+					Py1=y;
+					Sy2=Sy-Sy1;
+					Py2=y+Sy1+Sy;
+				}else	// y>=ipivot
+				{
+					// cela podmatice bude pod diagonalou
+					Sy1=Sy;
+					Py1=y+Sy;
+				}
+				if(Py1>=N) break;
+			// \STATE nacist a vynulovat $podmatice_{py}$; \COMMENT{Z=3}
+				cuda_copy_podmatice(N, ipivot, Py1, Sx, Sy1, s_matice, m_matice, m_prava_strana, COPY_MAT_B_GLOB_TO_A_SH);
+				if(Sy2>0) cuda_copy_podmatice(N, ipivot, Py2, Sx, Sy2, &(s_matice[Sx*Sy1]), m_matice, m_prava_strana, COPY_MAT_B_GLOB_TO_A_SH);
+				// todo: nenacitat prvky, ktere uz jsou v s_matice
+				cuda_copy_podmatice(N, ipivot, Py, Sx, Sy, &(s_matice[Sx*Sy]), m_matice, m_prava_strana, COPY_MAT_B_GLOB_TO_A_SH);
+				// todo: compute_podmatice3
+				cuda_compute_podmatice13(N, modul, ipivot, Sx, Sy, s_matice, actions, zpusob);
+
+				cuda_copy_podmatice(N, ipivot, Py1, Sx, Sy1, s_matice, m_matice, m_prava_strana, COPY_MAT_A_SH_TO_B_GLOB);
+				if(Sy2>0) cuda_copy_podmatice(N, ipivot, Py2, Sx, Sy2, &(s_matice[Sx*Sy1]), m_matice, m_prava_strana, COPY_MAT_A_SH_TO_B_GLOB);
+			// \FOR{$x$ := $p+1$ do $\lceil\frac{N+1}{S_x}\rceil$}
+				for(int x=ipivot+Sx;x<N+1;x+=Sx)
+				{
+				// \STATE nacist a aplikovat operace v $actions$ na $podmatice_{xy}$; \COMMENT{Z=4}
+					cuda_copy_podmatice(N, x, Py1, Sx, Sy1, s_matice, m_matice, m_prava_strana, COPY_MAT_B_GLOB_TO_A_SH);
+					if(Sy2>0) cuda_copy_podmatice(N, x, Py2, Sx, Sy2, &(s_matice[Sx*Sy1]), m_matice, m_prava_strana, COPY_MAT_B_GLOB_TO_A_SH);
+
+					cuda_copy_podmatice(N, x, Py, Sx, Sy, &(s_matice[Sx*Sy]), m_matice, m_prava_strana, COPY_MAT_B_GLOB_TO_A_SH);
+					// todo: compute_podmatice4
+					cuda_compute_podmatice24(N, modul, x, Sx, Sy, s_matice, actions, zpusob);
+					cuda_copy_podmatice(N, x, Py1, Sx, Sy1, s_matice, m_matice, m_prava_strana, COPY_MAT_A_SH_TO_B_GLOB);
+					if(Sy2>0) cuda_copy_podmatice(N, x, Py2, Sx, Sy2, &(s_matice[Sx*Sy1]), m_matice, m_prava_strana, COPY_MAT_A_SH_TO_B_GLOB);
+				}
+			// \ENDFOR
+			}
+		// \ENDIF
+		}
+	//\ENDFOR
+	}
+}
+	
+void cuda_GJE_podmatice(int N, unsigned int modul, unsigned int* m_matice, unsigned int* m_prava_strana, unsigned int zpusob)
 {
 	if(num_of_gpu<=0) return;
 	// TODO: dynamicky alokovana sdilena pamet
+	int T=(gpu_property.sharedMemPerBlock / sizeof(unsigned int));
+	int Nt=(int)floor((sqrt(1.0+4*(double)T)-1.0)/2.0);
 	unsigned int *g_matice, *g_prava_strana;
 	cudaProfilerStart();
 	cudaMalloc((void**)&g_matice, (N*N)*sizeof(unsigned int));
@@ -341,9 +621,17 @@ void cuda_GJE_while(int N, int modul, unsigned int* m_matice, unsigned int* m_pr
 	case 2:
 		num_of_threads=128;
 		break;
+	case 3:
+		num_of_threads = min( 32*((int)ceil((float)(N+1)/32.0)), gpu_property.maxThreadsPerBlock );
+		break;
 	}
-	//num_of_threads = min( ceil((float)(N+1)/32.0)*32, num_of_threads );
-	cuda_GJE_podmatice<<<1,num_of_threads>>>(N, modul, g_matice, g_prava_strana, zpusob);
+	if(N<=Nt)
+	{
+		cuda_GJE_while_kernel<<<1,num_of_threads,(N*(N+1))>>>(N, modul, g_matice, g_prava_strana, zpusob);
+	}else
+	{
+		//cuda_GJE_podmatice_kernel(N, 
+	}
 	cudaThreadSynchronize();
 	cuda_stop_measuring();
 
