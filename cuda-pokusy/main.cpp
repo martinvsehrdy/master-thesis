@@ -66,22 +66,30 @@ void statistic(list<float> l, float* quartal1, float* quartal2, float* quartal3,
 int main(int argc, char** argv)
 // argv[0] <N> <modul>
 {
-	int N=20;
+	int N=50;
 	unsigned int modul=0x10000003; //(~(unsigned int)0);
-	modul = 0x1003;	// 4099 je prvocislo
+	/*modul = 0x1003;	// 4099 je prvocislo
 	cout << "Modul = " << modul << endl;
 	unsigned int* M=new unsigned int[N*N];
 	unsigned int* P=new unsigned int[N];
 	for(int y=0;y<N;y++) for(int x=0;x<N;x++) M[get_index(x, y, N)]=10*x+y;
 	for(int y=0;y<N;y++) P[y]=800+y;
 
+	unsigned int setting=strtol("00111", NULL, 2);
 	hilbert_matrix(N, M, P);
-	gauss_jordan_elim_for(N, modul, M, P, 18);
+	gauss_jordan_elim_for(N, modul, M, P, setting);
 	save_matrix(N, M, P, "outmat-for");
 
 	hilbert_matrix(N, M, P);
 	vypsat_mat(N, N, M, P);
-	GJE_podmatice(N, modul, M, P, NULL, 18);
+	init_gpu_compute();
+	//cuda_GJE_podmatice(N, modul, M, P, setting);
+	unsigned int* S=new unsigned int[N*N+N];
+	copy_podmatice(N, 0, 0, N+1, N, S, M, P, COPY_MAT_B_GLOB_TO_A_SH);
+	cuda_GJE_global(N, modul, S, setting);
+	copy_podmatice(N, 0, 0, N+1, N, S, M, P, COPY_MAT_A_SH_TO_B_GLOB);
+	free(S);
+
 	save_matrix(N, M, P, "outmat-GJE");
 	vypsat_mat(N, N, M, P);
 	
@@ -97,14 +105,16 @@ int main(int argc, char** argv)
 	if(argc>2)
 	{
 		N=atoi(argv[1]);
-		zpusob=atoi(argv[2]);	// strtol(argv[2], NULL, 2);
+		zpusob=strtol(argv[2], NULL, 2);
 	}else
 	{
+		// TODO: (ne)vyuzivat sdilenou pamet; modulo v elementarni uprave;
 		cout << "#Program spustte ve tvaru:" << argv[0] << " <N> <zpusob zpracovani>" << endl;
 		cout << "#zpusob zpracovani: 0. bit \tfor/while(0) while/for(1)" << endl;
-		cout << "#                   1. bit \tbez deleni(0) s delenim(1)" << endl;
+		cout << "#(pocitano zprava)  1. bit \tbez deleni(0) s delenim(1)" << endl;
 		cout << "#                   2.3.bit \t1(00) 32(01) 128(10) vlaken" << endl;
 		cout << "#                   4.bit \tGPU(0) CPU(1)" << endl;
+		cout << "#                   5.bit \tmatice v sdilene(0), globalni(1) pameti" << endl;
 
 
 		cout << "#Vystup: <velikost N> <na GPU [ms]>\t<z GPU [ms]>\tprumer\tnejrychlejsi\t1.quartal\tmedian\t3.quartal\tnejpomalejsi\t<celkem [ms]>" << endl;
@@ -122,6 +132,9 @@ int main(int argc, char** argv)
 	{
 #endif
 		hilbert_matrix<unsigned int>(N, A, b);
+		gauss_jordan_elim_for(N, modul, A, b, zpusob);
+		save_matrix(N, A, b, "outmat-for");
+		hilbert_matrix<unsigned int>(N, A, b);
 #ifdef _DEBUG
 	vypsat_mat<unsigned int>(N, N, A, b);
 #endif
@@ -133,9 +146,20 @@ int main(int argc, char** argv)
 		}else
 		{
 			init_gpu_compute();
-			cuda_GJE_while(N, modul, A, b, zpusob);
+			if(zpusob & ZPUSOB_GLOBAL_MEM)
+			{
+				unsigned int* S=new unsigned int[N*N+N];
+				copy_podmatice(N, 0, 0, N+1, N, S, A, b, COPY_MAT_B_GLOB_TO_A_SH);
+				cuda_GJE_global(N, modul, S, zpusob);
+				copy_podmatice(N, 0, 0, N+1, N, S, A, b, COPY_MAT_A_SH_TO_B_GLOB);
+				free(S);
+			}else
+			{
+				cuda_GJE_podmatice(N, modul, A, b, zpusob);
+			}
 			tt = cuda_get_measured_time();
 		}
+		save_matrix(N, A, b, "outmat-computed");
 #ifndef _DEBUG
 		times.push_back(tt);
 		sum += tt;
@@ -148,7 +172,7 @@ int main(int argc, char** argv)
 	//<velikost N> <na GPU [ms]>\t<z GPU [ms]>\tprumer\tnejrychlejsi\t1.quartal\tmedian\t3.quartal\tnejpomalejsi\t<celkem [ms]>
 	cout << N << "\t?\t?\t" << prumer << "\t" << times.front() << "\t" << q1 << "\t" << q2 << "\t" << q3 << "\t" << times.back() << "\t" << sum << endl;
 #else
-	cout << tt;
+	cout << tt << "ms" << endl;
 #endif
 	//vypsat_mat<unsigned int>(N, N, A, b);
 #ifdef _DEBUG
@@ -164,5 +188,5 @@ int main(int argc, char** argv)
 	free(A);
 	free(b);
 	return 0;
-	*/
+	//*/
 }
