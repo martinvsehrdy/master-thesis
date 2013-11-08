@@ -66,7 +66,7 @@ void statistic(list<float> l, float* quartal1, float* quartal2, float* quartal3,
 int main(int argc, char** argv)
 // argv[0] <N> <modul>
 {
-	int N=50;
+	int N=8;
 	unsigned int modul=0x10000003; //(~(unsigned int)0);
 	/*modul = 0x1003;	// 4099 je prvocislo
 	cout << "Modul = " << modul << endl;
@@ -74,6 +74,7 @@ int main(int argc, char** argv)
 	unsigned int* P=new unsigned int[N];
 	for(int y=0;y<N;y++) for(int x=0;x<N;x++) M[get_index(x, y, N)]=10*x+y;
 	for(int y=0;y<N;y++) P[y]=800+y;
+	unsigned int settings = strtol("010010", NULL, 2);
 
 	unsigned int setting=strtol("00111", NULL, 2);
 	hilbert_matrix(N, M, P);
