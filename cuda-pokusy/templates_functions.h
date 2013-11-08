@@ -69,6 +69,7 @@ int save_matrix(int N, TYPE* matice, TYPE* prava_strana, char* filename)
 	file.open(filename, fstream::out);
 	if(!file.is_open()) return 1;*/
 	FILE* f=fopen(filename, "w");
+	 if (f==NULL) return 1;
 	//file << N << endl;
 	fprintf(f, "%d\n", N);
 	
@@ -156,12 +157,12 @@ void vypsat_vys(int N, TYPE* citatel, TYPE* jmenovatel)
 	int i;
 	for(i=0;i<min(N,30);i++)
 	{
-		if(citatel!=NULL) cout << citatel[i];
+		if(citatel!=NULL) printf("%u", citatel[i]);
 		cout << "/";
-		if(jmenovatel!=NULL) cout << jmenovatel[i];
-		cout << "\t";
+		if(jmenovatel!=NULL) printf("%u", jmenovatel[i]);
+		printf("\t");
 	}
-	if(i<N-1) cout << "...";
+	if(i<N-1) printf("...");
 }
 
 
