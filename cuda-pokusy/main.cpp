@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <iostream>
 #include <list>
+#include <sstream>
 #include "kernels_cpu.h"
 #include "templates_functions.h"
 #include "kernels.h"
@@ -66,36 +67,56 @@ void statistic(list<float> l, float* quartal1, float* quartal2, float* quartal3,
 int main(int argc, char** argv)
 // argv[0] <N> <modul>
 {
-	int N=8;
+	stringstream ss;
+	int N=640;
 	unsigned int modul=0x10000003; //(~(unsigned int)0);
-	/*modul = 0x1003;	// 4099 je prvocislo
-	cout << "Modul = " << modul << endl;
+	//modul = 0x1003;	// 4099 je prvocislo
+	/*cout << "Modul = " << modul << endl;
 	unsigned int* M=new unsigned int[N*N];
 	unsigned int* P=new unsigned int[N];
+	unsigned int* Pfor=new unsigned int[N];
 	for(int y=0;y<N;y++) for(int x=0;x<N;x++) M[get_index(x, y, N)]=10*x+y;
 	for(int y=0;y<N;y++) P[y]=800+y;
-	unsigned int settings = strtol("010010", NULL, 2);
+	unsigned int settings = strtol("001111", NULL, 2);
 
-	unsigned int setting=strtol("00111", NULL, 2);
-	hilbert_matrix(N, M, P);
-	gauss_jordan_elim_for(N, modul, M, P, setting);
-	save_matrix(N, M, P, "outmat-for");
+	hilbert_matrix(N, M, Pfor);
+	//gauss_jordan_elim_for(N, modul, M, Pfor, settings);
+	ss.str("");
+	ss.clear();
+	ss << "outmat-for";
+	//ss << N;
+	save_matrix(N, M, Pfor, (char*)ss.str().c_str());
 
 	hilbert_matrix(N, M, P);
 	vypsat_mat(N, N, M, P);
 	init_gpu_compute();
-	//cuda_GJE_podmatice(N, modul, M, P, setting);
-	unsigned int* S=new unsigned int[N*N+N];
-	copy_podmatice(N, 0, 0, N+1, N, S, M, P, COPY_MAT_B_GLOB_TO_A_SH);
-	cuda_GJE_global(N, modul, S, setting);
-	copy_podmatice(N, 0, 0, N+1, N, S, M, P, COPY_MAT_A_SH_TO_B_GLOB);
-	free(S);
-
-	save_matrix(N, M, P, "outmat-GJE");
+	cuda_GJE_podmatice(N, modul, M, P, settings);
+	//unsigned int* S=new unsigned int[N*N+N];
+	//copy_podmatice(N, 0, 0, N+1, N, S, M, P, COPY_MAT_B_GLOB_TO_A_SH);
+	//cuda_GJE_global(N, modul, S, setting);
+	//copy_podmatice(N, 0, 0, N+1, N, S, M, P, COPY_MAT_A_SH_TO_B_GLOB);
+	//free(S);
+	ss.str("");
+	ss.clear();
+	ss << "outmat-GJE";
+	//ss << N;
+	save_matrix(N, M, P, (char*)ss.str().c_str());
 	vypsat_mat(N, N, M, P);
-	
+
+	bool v=true;
+	for(int y=0;y<N;y++)
+	{
+		if( Pfor[y]!=P[y] )
+		{
+			v=false;
+			break;
+		}
+	}
+	if( v ) cout << endl << "SPRAVNE" << endl;
+
 	delete M;
 	delete P;
+	delete Pfor;
 #ifdef _DEBUG
 	cin.get();
 #else
@@ -129,12 +150,9 @@ int main(int argc, char** argv)
 	list<float> times;
 	times.clear();
 	float sum=0.0;
-	for(int i=0;i<POC_OPAKOVANI;i++)
+	for(int opakovani=0;opakovani<POC_OPAKOVANI;opakovani++)
 	{
 #endif
-		hilbert_matrix<unsigned int>(N, A, b);
-		gauss_jordan_elim_for(N, modul, A, b, zpusob);
-		save_matrix(N, A, b, "outmat-for");
 		hilbert_matrix<unsigned int>(N, A, b);
 #ifdef _DEBUG
 	vypsat_mat<unsigned int>(N, N, A, b);
@@ -144,6 +162,9 @@ int main(int argc, char** argv)
 		{
 			gauss_jordan_elim_for(N, modul, A, b, zpusob);
 			tt = get_measured_time();
+#ifndef _DEBUG
+			if(opakovani>0) break;
+#endif
 		}else
 		{
 			init_gpu_compute();
@@ -160,8 +181,14 @@ int main(int argc, char** argv)
 			}
 			tt = cuda_get_measured_time();
 		}
-		save_matrix(N, A, b, "outmat-computed");
 #ifndef _DEBUG
+		if(opakovani==0)
+		{
+			ss.str("");
+			ss.clear();
+			ss << "outmatN" << N << "Z" << argv[2];
+			save_matrix(N, A, b, (char*)ss.str().c_str());
+		}
 		times.push_back(tt);
 		sum += tt;
 		if( !(zpusob & ZPUSOB_CPU) ) cudaDeviceReset();

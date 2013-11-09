@@ -511,30 +511,15 @@ void compute_podmatice24(int N, unsigned int modul, int pivot_x, int Sx, int Sy,
 	int tid=0;
 	int bdim=1;
 	// p_mat - pomocná podmatice, max velikost Sx*Sy
-	cout << "actions1: ";
-	vypsat_vys<unsigned int>(minS, actions1, NULL);
-	cout << endl << "actions2: ";
-	vypsat_vys<unsigned int>(minS, actions2, NULL);
-	cout << endl << "actions3: ";
-	vypsat_vys<unsigned int>(minS*Sy, actions3, NULL);
-	cout << endl << "|||||||||||||||||||||" << endl;
-
 	
 	for(int isloupec=0;(isloupec<minS);isloupec++)
 	{
-		vypsat_mat<unsigned int>(Sx, Sy, s_mat, NULL);
-		cout << "-------------";
-		if( !(zpusob & PODMATICE_12) )
-			vypsat_mat<unsigned int>(Sx, Sy, p_mat, NULL);
-		cout << "=============";
-
 		int gdiag=pivot_x+isloupec;
 		unsigned int* pom_mat;
 		bool is_podm3;
 		if( (zpusob & PODMATICE_12) )	// diagonalni prvek je v 'isloupec'-tem sloupci v aktualni podmatici
 		{
 			// podmatice2
-			cout << "PODMATICE 2 - ";
 			pom_mat=s_mat;
 			is_podm3 = false;
 			// deleni: radek sdiag na '1'
@@ -554,11 +539,9 @@ void compute_podmatice24(int N, unsigned int modul, int pivot_x, int Sx, int Sy,
 		}else	// 'isloupec'-ty sloupec v podmatici je pod nebo nad diagonalnim prvkem
 		{
 			// podmatice4
-			cout << "PODMATICE 4 - ";
 			pom_mat=p_mat;
 			is_podm3 = true;
 		}
-		cout << "isloupec=" << isloupec << endl;
 		// -------------------
 		unsigned int a_pp = actions2[isloupec];
 		for(int iY=0;iY<Sy;iY++)
@@ -579,37 +562,34 @@ void compute_podmatice24(int N, unsigned int modul, int pivot_x, int Sx, int Sy,
 						s_mat[get_index(iX, iY, Sx)] = elem_uprava_bez_deleni(modul, a_xy, a_pp, a_xp, a_py);
 					}
 				}
+			}else
+			{
 			}
 		}
 	}
 	
-	vypsat_mat<unsigned int>(Sx, Sy, s_mat, NULL);
-	cout << "-------------";
 }
 // S DELENIM
 void compute_podmatice13(int N, unsigned int modul, int pivot_x, int Sx, int Sy, unsigned int* s_mat, unsigned int* actions, unsigned int zpusob)
 {
 	// podmatice s_mat: |-- podmatice, kterou pocitam (Sx*Sy cisel) --|
-	// podmatice p_mat: |-- podmatice, kterou potrebuji (az Sx^2 cisel) --|
+	// podmatice p_mat: |-- podmatice, kterou potrebuji (az Sx*Sm cisel) --|
 	int minS=min(Sx,Sy);
-	unsigned int* p_mat=&(s_mat[Sx*Sy]);		// ctvercova podmatice s pivotnimi radky, Sx*Sx cisel
+	unsigned int* p_mat=&(s_mat[Sx*Sy]);		// ctvercova podmatice s pivotnimi radky, Sx*Smin cisel
 	unsigned int* actions1=actions;				// indexy pivotnich radku, permutace radku, 'minS' cisel
 	unsigned int* actions2=&(actions1[minS]);	// cim vynasobit nebo vydelit pivotni radek; 'minS' cisel
-	unsigned int* actions3=&(actions2[minS]);	// multiplikatory, 'Sx*Sy' cisel
-	//cout << "modul = " << modul << endl;
+	unsigned int* actions3=&(actions2[minS]);	// multiplikatory, 'Smin*Sy' cisel
+
 	int tid=0;
 	int bdim=1;
-	// p_mat - pomocná podmatice, max velikost Sx*Sy
+	// p_mat - pomocna podmatice, max velikost Sx*Sy
 	
-	vypsat_mat<unsigned int>(Sx, Sy, s_mat, NULL);
-	cout << "-------------";
-	if( !(zpusob & PODMATICE_12) )
-		vypsat_mat<unsigned int>(Sx, Sy, p_mat, NULL);
-	cout << "=============";
 // \FOR{$p$ := $1$ do $Sx$}
 	for(int isloupec=0;(isloupec<minS);isloupec++)
 	{
 		// najit g_diagonalu ve sloupci 'isloupec'
+		int gdiag=pivot_x+isloupec;
+		if(gdiag>=N) continue;
 		unsigned int* pom_mat;
 		bool is_podm3;
 		// TODO: permutace radku, aby na diagonale nebyla nula
@@ -617,7 +597,6 @@ void compute_podmatice13(int N, unsigned int modul, int pivot_x, int Sx, int Sy,
 		if( zpusob & PODMATICE_12 )	// diagonalni prvek je v 'isloupec'-tem sloupci v aktualni podmatici
 		{
 			// podmatice1
-			cout << "PODMATICE 1 - ";
 			pom_mat=s_mat;
 			is_podm3 = false;
 			// deleni: radek sdiag na '1'
@@ -638,7 +617,6 @@ void compute_podmatice13(int N, unsigned int modul, int pivot_x, int Sx, int Sy,
 		}else	// 'isloupec'-ty sloupec v podmatici je pod nebo nad diagonalnim prvkem
 		{
 			// podmatice3
-			cout << "PODMATICE 3 - ";
 			pom_mat=p_mat;
 			is_podm3 = true;
 		}
@@ -653,42 +631,52 @@ void compute_podmatice13(int N, unsigned int modul, int pivot_x, int Sx, int Sy,
 		}
 		for(int iY=0;iY<Sy;iY++)
 		{
-			unsigned int a_py=0;
+			unsigned int a_py;
 			if( is_podm3 || iY!=isloupec )	// neupravuji pivotni radek pokud je podmatice1
 			{
 				a_py = s_mat[get_index(isloupec, iY, Sx)];
-				for(int iX=0;iX<Sx;iX++)
+				// TODO: ulozit a_pp, a_py
+				actions3[isloupec*Sy+iY]=a_py;
+				//cout << "SAVE(" << a_pp << ", " << a_py << ")" << endl;
+				if(a_py!=0)	// TODO: tuhle podminku dat do podm24
 				{
-					unsigned int a_xy = s_mat[get_index(iX, iY, Sx)];
-					unsigned int a_xp = pom_mat[get_index(iX, isloupec, Sx)];
-					//cout << "  " << a_xy << " * " << a_pp << " - " << a_xp << " * " << a_py << endl;
-					
-					if(zpusob & ZPUSOB_S_DELENIM)
+					for(int iX=0;iX<Sx;iX++)
 					{
-						s_mat[get_index(iX, iY, Sx)] = elem_uprava_s_delenim(modul, a_xy, a_xp, a_py);
-					}else
-					{
-						s_mat[get_index(iX, iY, Sx)] = elem_uprava_bez_deleni(modul, a_xy, a_pp, a_xp, a_py);
+						unsigned int a_xy = s_mat[get_index(iX, iY, Sx)];
+						unsigned int a_xp = pom_mat[get_index(iX, isloupec, Sx)];
+						//cout << "  " << a_xy << " * " << a_pp << " - " << a_xp << " * " << a_py << endl;
+						if(a_xp!=0)
+						{
+							if(zpusob & ZPUSOB_S_DELENIM)
+							{
+								s_mat[get_index(iX, iY, Sx)] = elem_uprava_s_delenim(modul, a_xy, a_xp, a_py);
+							}else
+							{
+								s_mat[get_index(iX, iY, Sx)] = elem_uprava_bez_deleni(modul, a_xy, a_pp, a_xp, a_py);
+							}
+						}
 					}
 				}
+			}else
+			{
+				actions3[isloupec*Sy+iY]=0;
 			}
-			actions3[isloupec*Sy+iY]=a_py;
-			cout << "actions3[" << (isloupec*Sy+iY) << "] = " << a_py << endl;
 		}
 		
-		vypsat_mat<unsigned int>(Sx, Sy, s_mat, NULL);
-		
 	}
-	cout << "-------------";
-	cout << "actions1: ";
-	vypsat_vys<unsigned int>(minS, actions1, NULL);
-	cout << endl << "actions2: ";
-	vypsat_vys<unsigned int>(minS, actions2, NULL);
-	cout << endl << "actions3: ";
-	vypsat_vys<unsigned int>(minS*Sy, actions3, NULL);
-	cout << endl << "|||||||||||||||||||||" << endl;
 	//*/
 	
+}
+int kontrola_pole(unsigned int* pole, int size, unsigned int blank)
+{
+	for(int i=0;i<size;i++)
+	{
+		if(pole[i]==blank)
+		{
+			return i;
+		}
+	}
+	return size;
 }
 /* celou matici rozdelim do obdelnikovych "podmatic", ktere budu postupne nahravat do sdilene pameti a pocitat
  * podmatice nemusi byt nutne ctvercova
@@ -696,20 +684,32 @@ void compute_podmatice13(int N, unsigned int modul, int pivot_x, int Sx, int Sy,
  */
 void GJE_podmatice(int N, unsigned int modul, unsigned int* m_matice, unsigned int* m_prava_strana, unsigned int zpusob)
 {
-	int Sx=3;	// TODO: s nastavenim Sx=3, Sy=4 to vyhazuje chybu
-	int Sy=5;
+	int T=2000;
+	int Sx;
+	int Sy;
+	float fSx=sqrt( (float)((N+1)*(N+1)+T) ) - (N+1);
+	if( fSx < 1)
+	{
+		Sx=1;
+		Sy=(T-3)/2;
+	}else
+	{
+		Sx=(int)floor(fSx);
+		Sy=N;
+	}
 	int Smin=min(Sx, Sy);
 	int size_s_matice=Sx*Sy+Sx*Smin;
+	int size_s_matice1=3*size_s_matice;
 	int size_actions=(Smin)*Sy+2*Smin;
 	int size_actions1=3*size_actions;
 	unsigned int mask_copy = 0x0000;
 	if( !(zpusob & ZPUSOB_S_DELENIM) ) mask_copy |= COPY_MAT_BEZ_DELENI; 
-	unsigned int* s_matice=(unsigned int*)malloc(size_s_matice*sizeof(unsigned int));
+	unsigned int* s_matice=(unsigned int*)malloc(size_s_matice1*sizeof(unsigned int));
 	unsigned int* actions=(unsigned int*)malloc(size_actions1*sizeof(unsigned int));
+	unsigned int* p_matice=&(s_matice[Sx*Sy]);
 	int konst=1000000;
 	for(int i=0;i<size_actions1;i++) actions[i]=konst;
-
-	unsigned int* p_matice=&(s_matice[Sx*Sy]);
+	for(int i=0;i<size_s_matice1;i++) s_matice[i]=konst;
 
 // \FOR{$p$ := $1$ do $\lceil\frac{N}{\min(S_x, S_y)}\rceil$}
 	for(int ipivot=0;ipivot<N;ipivot+=Smin)
@@ -717,13 +717,12 @@ void GJE_podmatice(int N, unsigned int modul, unsigned int* m_matice, unsigned i
 	// \STATE \COMMENT{zpracovani radku, kde je Z=1}
 	// \STATE nacist a spocitat $podmatice_{pp}$ \COMMENT{Z=1}
 		int Py=ipivot;
-	for(int i=0;i<size_actions1;i++) cout << actions[i] << " ";
 
 		copy_podmatice(N, ipivot, Py, Sx, Sy, s_matice, m_matice, m_prava_strana, COPY_MAT_B_GLOB_TO_A_SH);
 		// todo: compute_podmatice1
 		compute_podmatice13(N, modul, ipivot, Sx, Sy, s_matice, actions, zpusob | PODMATICE_12);
 		copy_podmatice(N, ipivot, Py, Sx, Sy, s_matice, m_matice, m_prava_strana, COPY_MAT_A_SH_TO_B_GLOB);
-		vypsat_mat<unsigned int>(N, N, m_matice, m_prava_strana);
+	
 	// \FOR{$x$ := $p+1$ do $\lceil\frac{N+1}{S_x}\rceil$}
 		for(int x=ipivot+Sx;x<N+1;x+=Sx)
 		{
@@ -732,7 +731,6 @@ void GJE_podmatice(int N, unsigned int modul, unsigned int* m_matice, unsigned i
 			// todo: compute_podmatice2
 			compute_podmatice24(N, modul, x, Sx, Sy, s_matice, actions, zpusob | PODMATICE_12);
 			copy_podmatice(N, x, Py, Sx, Sy, s_matice, m_matice, m_prava_strana, COPY_MAT_A_SH_TO_B_GLOB);
-		vypsat_mat<unsigned int>(N, N, m_matice, m_prava_strana);
 		}
 	//\ENDFOR
 	// \STATE \COMMENT{zpracovani ostatnich radku}
@@ -767,144 +765,41 @@ void GJE_podmatice(int N, unsigned int modul, unsigned int* m_matice, unsigned i
 				}
 				if(Py1>=N) break;
 			// \STATE nacist a vynulovat $podmatice_{py}$; \COMMENT{Z=3}
-				copy_podmatice(N, ipivot, Py1, Sx, Sy1, s_matice, m_matice, m_prava_strana, (COPY_MAT_B_GLOB_TO_A_SH | mask_copy) );
-				if(Sy2>0)
-					copy_podmatice(N, ipivot, Py2, Sx, Sy2, &(s_matice[Sx*Sy1]), m_matice, m_prava_strana, (COPY_MAT_B_GLOB_TO_A_SH | mask_copy) );
+				copy_podmatice(N, ipivot, Py1, Sx, Sy1, s_matice, m_matice, m_prava_strana, COPY_MAT_B_GLOB_TO_A_SH);
+				if(Sy2>0) copy_podmatice(N, ipivot, Py2, Sx, Sy2, &(s_matice[Sx*Sy1]), m_matice, m_prava_strana, COPY_MAT_B_GLOB_TO_A_SH);
 				// todo: nenacitat prvky, ktere uz jsou v s_matice
 				copy_podmatice(N, ipivot, Py, Sx, Smin, p_matice, m_matice, m_prava_strana, (COPY_MAT_B_GLOB_TO_A_SH | mask_copy) );
 				// todo: compute_podmatice3
 				compute_podmatice13(N, modul, ipivot, Sx, Sy, s_matice, actions, zpusob);
 
-				copy_podmatice(N, ipivot, Py1, Sx, Sy1, s_matice, m_matice, m_prava_strana, (COPY_MAT_A_SH_TO_B_GLOB | mask_copy) );
-				if(Sy2>0) copy_podmatice(N, ipivot, Py2, Sx, Sy2, &(s_matice[Sx*Sy1]), m_matice, m_prava_strana, (COPY_MAT_A_SH_TO_B_GLOB | mask_copy) );
-				vypsat_mat<unsigned int>(N, N, m_matice, m_prava_strana);
+				copy_podmatice(N, ipivot, Py1, Sx, Sy1, s_matice, m_matice, m_prava_strana, COPY_MAT_A_SH_TO_B_GLOB);
+				if(Sy2>0) copy_podmatice(N, ipivot, Py2, Sx, Sy2, &(s_matice[Sx*Sy1]), m_matice, m_prava_strana, COPY_MAT_A_SH_TO_B_GLOB);
 			// \FOR{$x$ := $p+1$ do $\lceil\frac{N+1}{S_x}\rceil$}
-				int xUp=N;
-				if( !(zpusob & ZPUSOB_S_DELENIM) ) xUp++;
-				for(int x=ipivot+Sx;x<xUp;x+=Sx)
+				for(int x=ipivot+Sx;x<N+1;x+=Sx)
 				{
 				// \STATE nacist a aplikovat operace v $actions$ na $podmatice_{xy}$; \COMMENT{Z=4}
-					copy_podmatice(N, x, Py1, Sx, Sy1, s_matice, m_matice, m_prava_strana, (COPY_MAT_B_GLOB_TO_A_SH | mask_copy) );
-					if(Sy2>0) copy_podmatice(N, x, Py2, Sx, Sy2, &(s_matice[Sx*Sy1]), m_matice, m_prava_strana, (COPY_MAT_B_GLOB_TO_A_SH | mask_copy) );
+					copy_podmatice(N, x, Py1, Sx, Sy1, s_matice, m_matice, m_prava_strana, COPY_MAT_B_GLOB_TO_A_SH);
+					if(Sy2>0) copy_podmatice(N, x, Py2, Sx, Sy2, &(s_matice[Sx*Sy1]), m_matice, m_prava_strana, COPY_MAT_B_GLOB_TO_A_SH);
 					copy_podmatice(N, x, Py, Sx, Smin, p_matice, m_matice, m_prava_strana, (COPY_MAT_B_GLOB_TO_A_SH | mask_copy) );
 					// todo: compute_podmatice4
 					compute_podmatice24(N, modul, x, Sx, Sy, s_matice, actions, zpusob);
-					copy_podmatice(N, x, Py1, Sx, Sy1, s_matice, m_matice, m_prava_strana, (COPY_MAT_A_SH_TO_B_GLOB | mask_copy) );
-					if(Sy2>0) copy_podmatice(N, x, Py2, Sx, Sy2, &(s_matice[Sx*Sy1]), m_matice, m_prava_strana, (COPY_MAT_A_SH_TO_B_GLOB | mask_copy) );
-					vypsat_mat<unsigned int>(N, N, m_matice, m_prava_strana);
+					copy_podmatice(N, x, Py1, Sx, Sy1, s_matice, m_matice, m_prava_strana, COPY_MAT_A_SH_TO_B_GLOB);
+					if(Sy2>0) copy_podmatice(N, x, Py2, Sx, Sy2, &(s_matice[Sx*Sy1]), m_matice, m_prava_strana, COPY_MAT_A_SH_TO_B_GLOB);
 				}
 			// \ENDFOR
 			}
 		// \ENDIF
 		}
-		// DEBUG
-		vypsat_mat<unsigned int>(N, N, m_matice, m_prava_strana);
 	//\ENDFOR
 	}
-	cout << "size_actions = " << size_actions << endl;
-
-	for(int i=0;i<size_actions1;i++)
-	{
-		if(actions[i]==konst)
-		{
-			cout << i << endl;
-			break;
-		}
-	}
-	if( !(zpusob & ZPUSOB_S_DELENIM) )
-	{
-		unsigned long long pom;
-		for(int i=0;i<N;i++)
-		{
-			pom = m_prava_strana[i];
-			pom *= compute_inverse_eukleides(m_matice[get_index(i, i, N)], modul);
-			pom %= modul;
-			m_prava_strana[i] = (unsigned int)pom;
-			m_matice[get_index(i, i, N)]=1;
-		}
-	}
-		vypsat_mat<unsigned int>(N, N, m_matice, m_prava_strana);
+	cout << "size_s_matice = " << size_s_matice << " pouzite=" << kontrola_pole(s_matice, size_s_matice1, konst) << endl;
+	cout << "size_actions = " << size_actions << " pouzite=" << kontrola_pole(actions, size_actions1, konst) << endl;
+	
 //\ENDFOR
 #ifndef _DEBUG
-	//free(s_matice);
-	//free(actions);
+	free(s_matice);
+	free(actions);
 #endif
-}
-
-void GJE_radky(int N, unsigned int modul, unsigned int* m_matice, unsigned int* m_prava_strana, unsigned int zpusob)
-{
-	int size_sh_mem=N+1;
-	unsigned int* sh_mem=(unsigned int*)malloc(size_sh_mem*sizeof(unsigned int));
-// \FOR{$p$ := $1$ do $N$}
-	for(int ipivot=0;ipivot<N;ipivot++)
-	{
-	// \STATE \COMMENT{nalezeni radku s nenulovou hodnotou prvku $[p;q]$, kde $p<=q$}
-		int q;	// CUDA: 'q' sdilene, pak si musi kazde vlakno vzit svou kopii
-		for(int i=ipivot;i<N;i++)
-		{
-			if(m_matice[get_index(ipivot, i, N)]!=0)
-			{
-				q=i;
-				break;
-			}
-		}
-	// \STATE \COMMENT{priprava pivotniho radku}
-	// \STATE nacist prvek $[p;q]$ do sdilene pameti
-		// CUDA: shared, tid==0
-		unsigned a_pq = m_matice[get_index(ipivot, q, N)];
-		sh_mem[ipivot] = a_pq;
-		unsigned int a_pq_inv=compute_inverse_eukleides(a_pq, modul);
-	// \FOR{$x$ := $p+1$ do $N$}
-		for(int iX=ipivot;iX<=N;iX++)	// CUDA: pres tid
-		{
-		// \STATE nacist, vydelit a ulozit do sdilene pameti
-			unsigned long long a;
-			if(iX==N) a = m_prava_strana[q];
-			else a = m_matice[get_index(iX, q, N)];
-			a *= a_pq_inv;
-			a %= modul;
-			sh_mem[iX] = (unsigned int)a;
-		}
-	// \ENDFOR
-	// \FOR{$y$ := $1$ do $N$}
-		for(int iY=0;iY<N;iY++)
-		{
-			unsigned int a_py = m_matice[get_index(ipivot, iY, N)];
-		// \FOR{$x$ := $p+1$ do $N$}
-			for(int iX=ipivot;iX<=N;iX++)
-			{
-			// \IF{$y$ == $q$}
-				if(iY == q)
-				{
-				// \STATE ulozit do globalni pameti prvek $[x;y]=[x;q]$
-					if(iX==N) m_prava_strana[iY] = sh_mem[iX];
-					else m_matice[get_index(iX, iY, N)] = sh_mem[iX];
-			// \ELSE
-				}else
-				{
-				// \STATE upravit prvek $[x;y]$ stejne jako pri nulovani prvku $[p;y]$
-					unsigned int a_xy;
-					if(iX==N) a_xy = m_prava_strana[iY];
-					else a_xy = m_matice[get_index(iX, iY, N)];
-					unsigned int a_xp = sh_mem[iX];
-					//cout << "  " << a_xy << " * " << a_pp << " - " << a_xp << " * " << a_py << endl;
-					if(zpusob & ZPUSOB_S_DELENIM)
-					{
-						a_xy = elem_uprava_s_delenim(modul, a_xy, a_xp, a_py);
-					}else
-					{
-						a_xy = elem_uprava_bez_deleni(modul, a_xy, a_pq, a_xp, a_py);
-					}
-					if(iX==N) m_prava_strana[iY] = a_xy;
-					else m_matice[get_index(iX, iY, N)] = a_xy;
-				}
-			// \ENDIF
-		// \ENDFOR
-			}
-		}
-	// \ENDFOR
-	}
-// \ENDFOR
 }
 
 unsigned int compute_inverse(unsigned int cislo, unsigned int modul)

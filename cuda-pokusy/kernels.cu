@@ -139,31 +139,30 @@ __device__ unsigned int cuda_elem_uprava_bez_deleni1(unsigned int modul, unsigne
 20: rf = uint2float_rn(r) ? inv2 + e23 * rf = ?r/m
 21: r = r ? umul24(float_as_int(rf),m)
 22: return (r < 0 ? r + m : r)
-*/
-	/*float invm=
-	h1=__uint2float_rz(__umulhi(x1,y1));
-	h2=__uint2float_rz(__umulhi(x2,y2));
-	l1=__float2uint_rz(__fmul_rn(h1, invm));
-	*/
-	unsigned long long m1;
-	unsigned long long pom;
 
-	pom = a_xy;
-	m1 = a_xp;
-	
-	pom *= a_pp;
-	m1 *= a_py;
-	if(pom >= m1)
+2: hi = umulhi(a ? 2, b ? 2) ? compute 32 MSB of the product
+3: mul. and truncate, inv = (double)(1 << 30)/m
+4: rf = uint2double_rn(hi) ? inv + (double)(3 << 51)	rf = floor(r/m)
+5: r = a ? b ? double2loint(rf) ? m 	partial residue
+6: return (r < 0 ? r + m : r)
+*/
+	unsigned int hi1 = __umulhi((a_xy << 1), (a_pp << 1));
+	unsigned int hi2 = __umulhi((a_xp << 1), (a_py << 1));
+	double invm = (double)(1 << 30)/modul;
+	double rf1 = __uint2double_rn(hi1)*invm + (double)(3 << 51);
+	double rf2 = __uint2double_rn(hi2)*invm + (double)(3 << 51);
+	unsigned long long pom1=a_xy;
+	pom1 *= a_pp;
+	unsigned long long pom2=__double2loint(rf1);
+	pom2 *= modul;
+	if(pom1<pom2)
 	{
-		pom -= m1;
-		pom %= modul;
+		pom1 += modul-pom2;
 	}else
 	{
-		m1 -= pom;
-		m1 %= modul;
-		pom = modul-m1;
+		pom1 -= pom2;
 	}
-	return ((unsigned int)pom);
+	return ((unsigned int)pom1);
 }
 /* nacte/ulozi podmatici z globalni p. do sdilene nebo zpet
  * Sx, Sy - velikost podmatice, mela by se vejit do sdilene pameti
@@ -405,11 +404,11 @@ __device__ void cuda_compute_podmatice24(int N, unsigned int modul, int pivot_x,
 	unsigned int* p_mat=&(s_mat[Sx*Sy]);
 	unsigned int* actions1=actions;				// indexy pivotnich radku, permutace radku, 'minS' cisel
 	unsigned int* actions2=&(actions1[minS]);	// cim vynasobit nebo vydelit pivotni radek; 'minS' cisel
-	unsigned int* actions3=&(actions2[minS]);	// multiplikatory, 'Sx*Sy' cisel
+	unsigned int* actions3=&(actions2[minS]);	// multiplikatory, 'Smin*Sy' cisel
 	//cout << "modul = " << modul << endl;
 	int tid=threadIdx.x;
 	int bdim=blockDim.x;
-	// p_mat - pomocná podmatice, max velikost Sx*Sy
+	// p_mat - pomocna podmatice, max velikost Sx*Sy
 	
 	for(int isloupec=0;(isloupec<minS);isloupec++)
 	{
@@ -480,7 +479,7 @@ __device__ void cuda_compute_podmatice13(int N, unsigned int modul, int pivot_x,
 	unsigned int* p_mat=&(s_mat[Sx*Sy]);
 	unsigned int* actions1=&(actions[0]);				// indexy pivotnich radku, permutace radku, 'minS' cisel
 	unsigned int* actions2=&(actions1[minS]);	// cim vynasobit nebo vydelit pivotni radek; 'minS' cisel
-	unsigned int* actions3=&(actions2[minS]);	// multiplikatory, 'Sx*Sy' cisel
+	unsigned int* actions3=&(actions2[minS]);	// multiplikatory, 'Smin*Sy' cisel
 
 	int tid=threadIdx.x;
 	int bdim=blockDim.x;
@@ -490,9 +489,7 @@ __device__ void cuda_compute_podmatice13(int N, unsigned int modul, int pivot_x,
 	for(int isloupec=0;(isloupec<minS);isloupec++)
 	{
 		// najit g_diagonalu ve sloupci 'isloupec'
-		int gdiag=pivot_x+isloupec;
-		//if(gdiag>=N) continue;
-		int sdiagy=isloupec;	// index pivotniho radku
+		
 		unsigned int* pom_mat;
 		bool is_podm3;
 		// TODO: permutace radku, aby na diagonale nebyla nula
@@ -507,7 +504,7 @@ __device__ void cuda_compute_podmatice13(int N, unsigned int modul, int pivot_x,
 			// deleni: radek sdiag na '1'
 			if( (tid==0) && (zpusob & ZPUSOB_S_DELENIM) )
 			{
-				actions2[isloupec]=cuda_compute_inverse_eukleides(s_mat[cuda_get_index(isloupec, sdiagy, Sx)], modul);
+				actions2[isloupec]=cuda_compute_inverse_eukleides(s_mat[cuda_get_index(isloupec, isloupec, Sx)], modul);
 			}
 			__syncthreads();
 			if( zpusob & ZPUSOB_S_DELENIM )
@@ -516,10 +513,10 @@ __device__ void cuda_compute_podmatice13(int N, unsigned int modul, int pivot_x,
 				int x=tid;
 				while(x<Sx)
 				{
-					unsigned long long pom = s_mat[cuda_get_index(x, sdiagy, Sx)];
+					unsigned long long pom = s_mat[cuda_get_index(x, isloupec, Sx)];
 					pom *= a_pp_inv;
 					pom %= modul;
-					s_mat[cuda_get_index(x, sdiagy, Sx)]=(unsigned int)pom;
+					s_mat[cuda_get_index(x, isloupec, Sx)]=(unsigned int)pom;
 					x+=bdim;
 				}
 				
@@ -536,7 +533,7 @@ __device__ void cuda_compute_podmatice13(int N, unsigned int modul, int pivot_x,
 		// -------------------
 		if( tid==0 && !(zpusob & ZPUSOB_S_DELENIM) )
 		{
-			actions2[isloupec] = pom_mat[cuda_get_index(isloupec, sdiagy, Sx)];
+			actions2[isloupec] = pom_mat[cuda_get_index(isloupec, isloupec, Sx)];
 		}
 		unsigned int a_pp=1;
 		if( !(zpusob & ZPUSOB_S_DELENIM) )
@@ -549,7 +546,7 @@ __device__ void cuda_compute_podmatice13(int N, unsigned int modul, int pivot_x,
 		while(iY<Sy)
 		{
 			unsigned int a_py;
-			if( is_podm3 || iY!=sdiagy )	// neupravuji pivotni radek pokud je podmatice1
+			if( is_podm3 || iY!=isloupec )	// neupravuji pivotni radek pokud je podmatice1
 			{
 				a_py = s_mat[cuda_get_index(isloupec, iY, Sx)];
 				// TODO: ulozit a_pp, a_py
@@ -560,7 +557,7 @@ __device__ void cuda_compute_podmatice13(int N, unsigned int modul, int pivot_x,
 					for(int iX=0;iX<Sx;iX++)
 					{
 						unsigned int a_xy = s_mat[cuda_get_index(iX, iY, Sx)];
-						unsigned int a_xp = pom_mat[cuda_get_index(iX, sdiagy, Sx)];
+						unsigned int a_xp = pom_mat[cuda_get_index(iX, isloupec, Sx)];
 						//cout << "  " << a_xy << " * " << a_pp << " - " << a_xp << " * " << a_py << endl;
 						if(a_xp!=0)
 						{
@@ -589,10 +586,14 @@ __device__ void cuda_compute_podmatice13(int N, unsigned int modul, int pivot_x,
 __global__ void cuda_GJE_podmatice_kernel(int N, int Sx, int Sy, unsigned int modul, unsigned int* m_matice, unsigned int* m_prava_strana, unsigned int zpusob)
 {
 	extern __shared__ unsigned int shared_memory[];
+	//int bid = blockIdx.x;
+	//int gdim = gridDim.x;
 	int Smin=min(Sx, Sy);
-	unsigned int* s_matice=&(shared_memory[0]);	// velikost Sx*(Sy+Sx)
-	unsigned int* actions=&(shared_memory[Sx*(Sy+Sx)]);	// velikost (Sx*Sy+2*Smin)
-
+	unsigned int* s_matice=&(shared_memory[0]);	// velikost Sx*Sy+Sx*Smin = Sx*(Sy+Smin)
+	unsigned int* actions=&(shared_memory[Sx*(Sy+Smin)]);	// velikost Smin*Sy+2*Smin
+	unsigned int mask_copy = 0x0000;
+	if( !(zpusob & ZPUSOB_S_DELENIM) ) mask_copy |= COPY_MAT_BEZ_DELENI;
+	unsigned int* p_matice=&(s_matice[Sx*Sy]);
 	
 // \FOR{$p$ := $1$ do $\lceil\frac{N}{\min(S_x, S_y)}\rceil$}
 	for(int ipivot=0;ipivot<N;ipivot+=Smin)
@@ -658,7 +659,7 @@ __global__ void cuda_GJE_podmatice_kernel(int N, int Sx, int Sy, unsigned int mo
 				if(Sy2>0) cuda_copy_podmatice(N, ipivot, Py2, Sx, Sy2, &(s_matice[Sx*Sy1]), m_matice, m_prava_strana, COPY_MAT_B_GLOB_TO_A_SH);
 				//__syncthreads();
 				// todo: nenacitat prvky, ktere uz jsou v s_matice
-				cuda_copy_podmatice(N, ipivot, Py, Sx, Sy, &(s_matice[Sx*Sy]), m_matice, m_prava_strana, COPY_MAT_B_GLOB_TO_A_SH);
+				cuda_copy_podmatice(N, ipivot, Py, Sx, Smin, p_matice, m_matice, m_prava_strana, COPY_MAT_B_GLOB_TO_A_SH );
 				//__syncthreads();
 				// todo: compute_podmatice3
 				cuda_compute_podmatice13(N, modul, ipivot, Sx, Sy, s_matice, actions, zpusob);
@@ -673,7 +674,7 @@ __global__ void cuda_GJE_podmatice_kernel(int N, int Sx, int Sy, unsigned int mo
 				// \STATE nacist a aplikovat operace v $actions$ na $podmatice_{xy}$; \COMMENT{Z=4}
 					cuda_copy_podmatice(N, x, Py1, Sx, Sy1, s_matice, m_matice, m_prava_strana, COPY_MAT_B_GLOB_TO_A_SH);
 					if(Sy2>0) cuda_copy_podmatice(N, x, Py2, Sx, Sy2, &(s_matice[Sx*Sy1]), m_matice, m_prava_strana, COPY_MAT_B_GLOB_TO_A_SH);
-					cuda_copy_podmatice(N, x, Py, Sx, Sy, &(s_matice[Sx*Sy]), m_matice, m_prava_strana, COPY_MAT_B_GLOB_TO_A_SH);
+					cuda_copy_podmatice(N, x, Py, Sx, Smin, p_matice, m_matice, m_prava_strana, COPY_MAT_B_GLOB_TO_A_SH );
 					//__syncthreads();
 					// todo: compute_podmatice4
 					cuda_compute_podmatice24(N, modul, x, Sx, Sy, s_matice, actions, zpusob);
@@ -715,7 +716,7 @@ void cuda_GJE_podmatice(int N, unsigned int modul, unsigned int* m_matice, unsig
 		num_of_threads=128;
 		break;
 	case 3:
-		num_of_threads = min( 32*((int)ceil((float)(N+1)/32.0)), gpu_property.maxThreadsPerBlock );
+		num_of_threads = min( gpu_property.warpSize*((int)ceil((float)(N+1)/gpu_property.warpSize)), gpu_property.maxThreadsPerBlock );
 		break;
 	}
 	if(N<=Nt)
@@ -723,9 +724,21 @@ void cuda_GJE_podmatice(int N, unsigned int modul, unsigned int* m_matice, unsig
 		cuda_GJE_while_kernel<<<1,num_of_threads,(N*(N+1))*sizeof(unsigned int)>>>(N, modul, g_matice, g_prava_strana, zpusob);
 	}else
 	{
-		int Sx=4;
-		int Sy=4;
-		int size_of_shared=Sx*(Sx+2*Sy)+2*min(Sx,Sy);
+		int Sx;
+		int Sy;
+		float fSx=sqrt( (float)((N+1)*(N+1)+T) ) - (N+1);
+		if( fSx < 1)
+		{
+			Sx=1;
+			Sy=(T-3)/2;
+		}else
+		{
+			Sx=(int)floor(fSx);
+			Sy=N;
+		}
+		int Smin=min(Sx,Sy);
+		int size_of_shared= Sx*Sy+Sx*Smin +	// size_s_matice
+							Smin*Sy+2*Smin;	// size_actions
 		// 
 		cuda_GJE_podmatice_kernel<<<1,num_of_threads,size_of_shared*sizeof(unsigned int)>>>(N, Sx, Sy, modul, g_matice, g_prava_strana, zpusob);
 	}
@@ -924,7 +937,7 @@ void test_elem_uprava(int N, unsigned int modul, unsigned int zpusob)
 		num_of_threads=128;
 		break;
 	case 3:
-		num_of_threads = min( 256*((int)ceil((float)(N+1)/32.0)), gpu_property.maxThreadsPerBlock );
+		num_of_threads = min( 32*((int)ceil((float)(N+1)/32.0)), gpu_property.maxThreadsPerBlock );
 		break;
 	}
 
