@@ -68,19 +68,19 @@ int main(int argc, char** argv)
 // argv[0] <N> <modul>
 {
 	stringstream ss;
-	int N=640;
+	int N=10;
 	unsigned int modul=0x10000003; //(~(unsigned int)0);
 	//modul = 0x1003;	// 4099 je prvocislo
-	/*cout << "Modul = " << modul << endl;
+	cout << "Modul = " << modul << endl;
 	unsigned int* M=new unsigned int[N*N];
 	unsigned int* P=new unsigned int[N];
 	unsigned int* Pfor=new unsigned int[N];
 	for(int y=0;y<N;y++) for(int x=0;x<N;x++) M[get_index(x, y, N)]=10*x+y;
 	for(int y=0;y<N;y++) P[y]=800+y;
-	unsigned int settings = strtol("001111", NULL, 2);
+	unsigned int settings = strtol("1001111", NULL, 2);
 
 	hilbert_matrix(N, M, Pfor);
-	//gauss_jordan_elim_for(N, modul, M, Pfor, settings);
+	gauss_jordan_elim_for(N, modul, M, Pfor, settings);
 	ss.str("");
 	ss.clear();
 	ss << "outmat-for";
@@ -137,6 +137,7 @@ int main(int argc, char** argv)
 		cout << "#                   2.3.bit \t1(00) 32(01) 128(10) vlaken" << endl;
 		cout << "#                   4.bit \tGPU(0) CPU(1)" << endl;
 		cout << "#                   5.bit \tmatice v sdilene(0), globalni(1) pameti" << endl;
+		cout << "#                   6.bit \tmetoda: podmatice(0), radky(1)" << endl;
 
 
 		cout << "#Vystup: <velikost N> <na GPU [ms]>\t<z GPU [ms]>\tprumer\tnejrychlejsi\t1.quartal\tmedian\t3.quartal\tnejpomalejsi\t<celkem [ms]>" << endl;

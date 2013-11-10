@@ -802,6 +802,82 @@ void GJE_podmatice(int N, unsigned int modul, unsigned int* m_matice, unsigned i
 #endif
 }
 
+void GJE_radky(int N, unsigned int modul, unsigned int* m_matice, unsigned int* m_prava_strana, unsigned int zpusob)
+{
+	int size_sh_mem=N+1;
+	unsigned int* sh_mem=(unsigned int*)malloc(size_sh_mem*sizeof(unsigned int));
+// \FOR{$p$ := $1$ do $N$}
+	for(int ipivot=0;ipivot<N;ipivot++)
+	{
+	// \STATE \COMMENT{nalezeni radku s nenulovou hodnotou prvku $[p;q]$, kde $p<=q$}
+		int q;	// CUDA: 'q' sdilene, pak si musi kazde vlakno vzit svou kopii
+		for(int i=ipivot;i<N;i++)
+		{
+			if(m_matice[get_index(ipivot, i, N)]!=0)
+			{
+				q=i;
+				break;
+			}
+		}
+	// \STATE \COMMENT{priprava pivotniho radku}
+	// \STATE nacist prvek $[p;q]$ do sdilene pameti
+		// CUDA: shared, tid==0
+		unsigned a_pq = m_matice[get_index(ipivot, q, N)];
+		sh_mem[ipivot] = a_pq;
+		unsigned int a_pq_inv=compute_inverse_eukleides(a_pq, modul);
+	// \FOR{$x$ := $p+1$ do $N$}
+		for(int iX=ipivot;iX<=N;iX++)	// CUDA: pres tid
+		{
+		// \STATE nacist, vydelit a ulozit do sdilene pameti
+			unsigned long long a;
+			if(iX==N) a = m_prava_strana[q];
+			else a = m_matice[get_index(iX, q, N)];
+			a *= a_pq_inv;
+			a %= modul;
+			sh_mem[iX] = (unsigned int)a;
+		}
+	// \ENDFOR
+	// \FOR{$y$ := $1$ do $N$}
+		for(int iY=0;iY<N;iY++)
+		{
+			unsigned int a_py = m_matice[get_index(ipivot, iY, N)];
+		// \FOR{$x$ := $p+1$ do $N$}
+			for(int iX=ipivot;iX<=N;iX++)
+			{
+			// \IF{$y$ == $q$}
+				if(iY == q)
+				{
+				// \STATE ulozit do globalni pameti prvek $[x;y]=[x;q]$
+					if(iX==N) m_prava_strana[iY] = sh_mem[iX];
+					else m_matice[get_index(iX, iY, N)] = sh_mem[iX];
+			// \ELSE
+				}else
+				{
+				// \STATE upravit prvek $[x;y]$ stejne jako pri nulovani prvku $[p;y]$
+					unsigned int a_xy;
+					if(iX==N) a_xy = m_prava_strana[iY];
+					else a_xy = m_matice[get_index(iX, iY, N)];
+					unsigned int a_xp = sh_mem[iX];
+					//cout << "  " << a_xy << " * " << a_pp << " - " << a_xp << " * " << a_py << endl;
+					if(zpusob & ZPUSOB_S_DELENIM)
+					{
+						a_xy = elem_uprava_s_delenim(modul, a_xy, a_xp, a_py);
+					}else
+					{
+						a_xy = elem_uprava_bez_deleni(modul, a_xy, a_pq, a_xp, a_py);
+					}
+					if(iX==N) m_prava_strana[iY] = a_xy;
+					else m_matice[get_index(iX, iY, N)] = a_xy;
+				}
+			// \ENDIF
+		// \ENDFOR
+			}
+		}
+	// \ENDFOR
+	}
+// \ENDFOR
+}
+
 unsigned int compute_inverse(unsigned int cislo, unsigned int modul)
 {
 	// TODO: pouzit eukliduv alg.
