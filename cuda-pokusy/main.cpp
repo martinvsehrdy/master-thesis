@@ -71,7 +71,7 @@ int main(int argc, char** argv)
 	int N=10;
 	unsigned int modul=0x10000003; //(~(unsigned int)0);
 	//modul = 0x1003;	// 4099 je prvocislo
-	cout << "Modul = " << modul << endl;
+	/*cout << "Modul = " << modul << endl;
 	unsigned int* M=new unsigned int[N*N];
 	unsigned int* P=new unsigned int[N];
 	unsigned int* Pfor=new unsigned int[N];
@@ -169,16 +169,23 @@ int main(int argc, char** argv)
 		}else
 		{
 			init_gpu_compute();
-			if(zpusob & ZPUSOB_GLOBAL_MEM)
+			
+			if( zpusob & ZPUSOB_RADKY )
 			{
-				unsigned int* S=new unsigned int[N*N+N];
-				copy_podmatice(N, 0, 0, N+1, N, S, A, b, COPY_MAT_B_GLOB_TO_A_SH);
-				cuda_GJE_global(N, modul, S, zpusob);
-				copy_podmatice(N, 0, 0, N+1, N, S, A, b, COPY_MAT_A_SH_TO_B_GLOB);
-				free(S);
+				cuda_GJE_radky(N, modul, A, b, zpusob);
 			}else
 			{
-				cuda_GJE_podmatice(N, modul, A, b, zpusob);
+				if(zpusob & ZPUSOB_GLOBAL_MEM)
+				{
+					unsigned int* S=new unsigned int[N*N+N];
+					copy_podmatice(N, 0, 0, N+1, N, S, A, b, COPY_MAT_B_GLOB_TO_A_SH);
+					cuda_GJE_global(N, modul, S, zpusob);
+					copy_podmatice(N, 0, 0, N+1, N, S, A, b, COPY_MAT_A_SH_TO_B_GLOB);
+					free(S);
+				}else
+				{
+					cuda_GJE_podmatice(N, modul, A, b, zpusob);
+				}
 			}
 			tt = cuda_get_measured_time();
 		}
