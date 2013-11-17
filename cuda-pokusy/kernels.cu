@@ -95,75 +95,6 @@ __device__ unsigned int cuda_elem_uprava_bez_deleni(unsigned int modul, unsigned
 	}
 	return ((unsigned int)pom);
 }
-// elementarni uprava s delenim
-__device__ unsigned int cuda_elem_uprava_s_delenim1(unsigned int modul, unsigned int a_xy, unsigned int a_xp, unsigned int a_py)
-// \STATE $a_{xy} := a_{xy} - a_xp \cdot a_py$
-// TODO: merit rychlosti modulovani % a __umulhi
-{
-	unsigned long long m1;
-	unsigned long long pom;
-
-	pom = a_xy;
-	m1 = a_xp;
-	
-	m1 *= a_py;
-	if(pom >= m1)
-	{
-		pom -= m1;
-		pom %= modul;
-	}else
-	{
-		m1 -= pom;
-		m1 %= modul;
-		pom = modul-m1;
-	}
-	return ((unsigned int)pom);
-}
-// elementarni uprava bez deleni
-__device__ unsigned int cuda_elem_uprava_bez_deleni1(unsigned int modul, unsigned int a_xy, unsigned int a_pp, unsigned int a_xp, unsigned int a_py)
-// \STATE $a_{xy} := a_{xy} \cdot a_pp - a_xp \cdot a_py$
-{
-	unsigned int x1=a_xy;
-	unsigned int y1=a_pp;
-	unsigned int x2=a_xp;
-	unsigned int y2=a_py;
-	/*
- * computes (x1y1 ? x2y2) mod m
-13: h1 = uint2float_rz(umul24hi(x1, y1)) * two inlined mul_mod’s
-14: h2 = uint2float_rz(umul24hi(x2, y2))
-15: l1 = float2uint_rz(fmul_rn(h1, inv1)) * inv1 = 65536.0f/m
-16: l2 = float2uint_rz(fmul_rn(h2, inv1)) * mul. and truncate
-17: r = mc + umul24(x1, y1) ? umul24(l1,m) * mc = m * 100
-18: r = r ? umul24(x2, y2) + umul24(l2,m) * diff. of mul_mod’s
-19: * inv2 = 1.0f/m, e23 = (float)(1 << 23)
-20: rf = uint2float_rn(r) ? inv2 + e23 * rf = ?r/m
-21: r = r ? umul24(float_as_int(rf),m)
-22: return (r < 0 ? r + m : r)
-
-2: hi = umulhi(a ? 2, b ? 2) ? compute 32 MSB of the product
-3: mul. and truncate, inv = (double)(1 << 30)/m
-4: rf = uint2double_rn(hi) ? inv + (double)(3 << 51)	rf = floor(r/m)
-5: r = a ? b ? double2loint(rf) ? m 	partial residue
-6: return (r < 0 ? r + m : r)
-*/
-	unsigned int hi1 = __umulhi((a_xy << 1), (a_pp << 1));
-	unsigned int hi2 = __umulhi((a_xp << 1), (a_py << 1));
-	double invm = (double)(1 << 30)/modul;
-	double rf1 = __uint2double_rn(hi1)*invm + (double)(3 << 51);
-	double rf2 = __uint2double_rn(hi2)*invm + (double)(3 << 51);
-	unsigned long long pom1=a_xy;
-	pom1 *= a_pp;
-	unsigned long long pom2=__double2loint(rf1);
-	pom2 *= modul;
-	if(pom1<pom2)
-	{
-		pom1 += modul-pom2;
-	}else
-	{
-		pom1 -= pom2;
-	}
-	return ((unsigned int)pom1);
-}
 /* nacte/ulozi podmatici z globalni p. do sdilene nebo zpet
  * Sx, Sy - velikost podmatice, mela by se vejit do sdilene pameti
  * sx, sy - souradnice zvolene podmatice v matici, sx \in [0; ceil(N/Sx)]
@@ -757,10 +688,9 @@ void cuda_GJE_podmatice(int N, unsigned int modul, unsigned int* m_matice, unsig
 __global__ void cuda_GJE_radky_kernel(int N, unsigned int modul, unsigned int* m_matice, unsigned int* m_prava_strana, unsigned int zpusob)
 {
 	int tid=threadIdx.x;
-	int bdim=blockDim.x-1;	// posledni vlakno bude jen hledat inverzi
-	int bid=blockIdx.x;
-	int gdim=gridDim.x;
-	bool inverse_thread = ( (tid == bdim) && (bid == 0) );
+	int bdim=blockDim.x;
+	//int bid=blockIdx.x;
+	//int gdim=gridDim.x;
 
 	extern __shared__ unsigned int sh_mem[];	// size_sh_mem = N+1
 	__shared__ int sh_q;	// CUDA: 'q' sdilene, pak si musi kazde vlakno vzit svou kopii
@@ -768,13 +698,11 @@ __global__ void cuda_GJE_radky_kernel(int N, unsigned int modul, unsigned int* m
 	int q;
 	if( tid==0 ) sh_q=N;
 // \FOR{$p$ := $1$ do $N$}
+	// TODO: pouzit atomicInc kdyz budu pracovat s vice bloky
 	for(int ipivot=0;ipivot<N;ipivot++)
 	{
-		int i;
 	// \STATE \COMMENT{nalezeni radku s nenulovou hodnotou prvku $[p;q]$, kde $p<=q$}
-		if( ipivot==0 && !inverse_thread )	// TODO: || vlakno inverze nenaslo radek s nenulovym cislem
-		{
-			i=ipivot+tid;
+		int i=ipivot+tid;
 			while(i<N)
 			{
 				if(m_matice[cuda_get_index(ipivot, i, N)]!=0)
@@ -784,15 +712,14 @@ __global__ void cuda_GJE_radky_kernel(int N, unsigned int modul, unsigned int* m
 				}
 				i+=bdim;
 			}
-		}
 		//*/
-		if( inverse_thread ) sh_q=ipivot;
+		if( tid==0 ) sh_q=ipivot;
 		__syncthreads();
 		q=sh_q;
 	// \STATE \COMMENT{priprava pivotniho radku}
 	// \STATE nacist prvek $[p;q]$ do sdilene pameti
 		// CUDA: shared, tid==0
-		if( inverse_thread && ipivot==0 )
+		if( tid==0 )
 		{
 			unsigned int a_pq = m_matice[cuda_get_index(ipivot, q, N)];
 			sh_mem[ipivot] = a_pq;
@@ -816,29 +743,6 @@ __global__ void cuda_GJE_radky_kernel(int N, unsigned int modul, unsigned int* m
 		__syncthreads();
 	// \ENDFOR
 	// \FOR{$y$ := $1$ do $N$}
-		if( inverse_thread && ((ipivot+1) < N) )
-		{
-			unsigned int a_py = m_matice[cuda_get_index(ipivot, q+1, N)];
-			unsigned int a_pq = sh_mem[ipivot];
-		// \STATE upravit prvek $[x;y]$ stejne jako pri nulovani prvku $[p;y]$
-			unsigned int a_xy = m_matice[cuda_get_index((ipivot+1), q+1, N)];
-			unsigned int a_xp = sh_mem[(ipivot+1)];
-			//cout << "  " << a_xy << " * " << a_pp << " - " << a_xp << " * " << a_py << endl;
-			if(zpusob & ZPUSOB_S_DELENIM)
-			{
-				a_xy = cuda_elem_uprava_s_delenim(modul, a_xy, a_xp, a_py);
-			}else
-			{
-				a_xy = cuda_elem_uprava_bez_deleni(modul, a_xy, a_pq, a_xp, a_py);
-			}
-			if( a_xy != 0 )
-			{
-				sh_q = cuda_compute_inverse_eukleides(a_xy, modul);
-			}
-			m_matice[cuda_get_index((ipivot+1), q+1, N)] = a_xy;
-
-		}else
-		{
 			i=tid;	// prochazi pres Y, kazde vlakno samostatny radek
 			while(i<N)
 			{
@@ -856,7 +760,6 @@ __global__ void cuda_GJE_radky_kernel(int N, unsigned int modul, unsigned int* m
 				// \ELSE
 					}else
 					{
-						if( (i == (q+1)) && (iX == (ipivot+1)) && ((ipivot+1) < N) ) continue;
 					// \STATE upravit prvek $[x;y]$ stejne jako pri nulovani prvku $[p;y]$
 						unsigned int a_xy;
 						if(iX==N) a_xy = m_prava_strana[i];
@@ -878,7 +781,6 @@ __global__ void cuda_GJE_radky_kernel(int N, unsigned int modul, unsigned int* m
 				}
 				i+=bdim;
 			}
-		}
 	// \ENDFOR
 		__syncthreads();
 	}
@@ -888,7 +790,6 @@ __global__ void cuda_GJE_radky_kernel(int N, unsigned int modul, unsigned int* m
 void cuda_GJE_radky(int N, unsigned int modul, unsigned int* m_matice, unsigned int* m_prava_strana, unsigned int zpusob)
 {
 	if(num_of_gpu<=0) return;
-	int T=(gpu_property.sharedMemPerBlock / sizeof(unsigned int));
 	unsigned int *g_matice, *g_prava_strana;
 	cudaProfilerStart();
 	cudaMalloc((void**)&g_matice, (N*N)*sizeof(unsigned int));
@@ -1032,89 +933,75 @@ void cuda_GJE_global(int N, unsigned int modul, unsigned int* m_matice, unsigned
 	cudaProfilerStop();
 }
 
-__global__ void test_elem_uprava_kernel0(int n, unsigned int modul)
+__global__ void test_elem_uprava_bez_deleni(int n, unsigned int modul)
 {
-	int i=threadIdx.x;
+	int bdim=blockDim.x;
 	unsigned int a1=1298161;
 	unsigned int a2;
-	while(i<n)
+	unsigned int a3=a1;
+	for(int i=0;i<n;i+=bdim)
 	{
-		a2=a1;
+		a3=a1;
 		a1=cuda_elem_uprava_bez_deleni(modul, a1, 1293001, a2, 1269239);
-		i+=blockDim.x;
+		a2=a3;
 	}
 }
-__global__ void test_elem_uprava_kernel1(int n, unsigned int modul)
+__global__ void test_elem_uprava_s_delenim(int n, unsigned int modul)
 {
-	int i=threadIdx.x;
+	int bdim=blockDim.x;
 	unsigned int a1=1298161;
 	unsigned int a2;
-	while(i<n)
+	unsigned int a3=a1;
+	for(int i=0;i<n;i+=bdim)
 	{
-		a2=a1;
-		cuda_elem_uprava_s_delenim(modul, a1, a2, 1269239);
-		i+=blockDim.x;
-	}
-}
-__global__ void test_elem_uprava_kernel2(int n, unsigned int modul)
-{
-	int i=threadIdx.x;
-	unsigned int a1=1298161;
-	unsigned int a2;
-	while(i<n)
-	{
-		a2=a1;
-		cuda_elem_uprava_bez_deleni1(modul, a1, 1293001, a2, 1269239);
-		i+=blockDim.x;
-	}
-}
-__global__ void test_elem_uprava_kernel3(int n, unsigned int modul)
-{
-	int i=threadIdx.x;
-	unsigned int a1=1298161;
-	unsigned int a2;
-	while(i<n)
-	{
-		a2=a1;
-		cuda_elem_uprava_s_delenim1(modul, a1, a2, 1269239);
-		i+=blockDim.x;
+		a3=a1;
+		a1=cuda_elem_uprava_s_delenim(modul, a1, a2, 1269239);
+		a2=a3;
 	}
 }
 void test_elem_uprava(int N, unsigned int modul, unsigned int zpusob)
 {
 	if(num_of_gpu<=0) return;
 	cudaProfilerStart();
-	int num_of_threads;
-	switch( ((zpusob & ZPUSOB_VLAKNA) >> 2) )
-	{
-	case 0:
-		num_of_threads=1;
-		break;
-	case 1:
-		num_of_threads=32;
-		break;
-	case 2:
-		num_of_threads=128;
-		break;
-	case 3:
-		num_of_threads = min( 32*((int)ceil((float)(N+1)/32.0)), gpu_property.maxThreadsPerBlock );
-		break;
-	}
+	int num_of_threads=1;
 
 	cuda_start_measuring();
 	// vypocet
-	switch( (zpusob & 0x0003) )
+	if( (zpusob & ZPUSOB_S_DELENIM) )
 	{
-	case 0: test_elem_uprava_kernel0<<<1,num_of_threads>>>(N, modul);
-		break;
-	case 1: test_elem_uprava_kernel1<<<1,num_of_threads>>>(N, modul);
-		break;
-	case 2: test_elem_uprava_kernel2<<<1,num_of_threads>>>(N, modul);
-		break;
-	case 3: test_elem_uprava_kernel3<<<1,num_of_threads>>>(N, modul);
-		break;
-
+		test_elem_uprava_s_delenim<<<1,num_of_threads>>>(N, modul);
+	}else
+	{
+		test_elem_uprava_bez_deleni<<<1,num_of_threads>>>(N, modul);
 	}
+
+	cudaThreadSynchronize();
+	cuda_stop_measuring();
+	
+	cudaProfilerStop();
+}
+
+__global__ void test_inverse_kernel(int n, unsigned int modul)
+{
+	int bdim=blockDim.x;
+	unsigned int a1=1757161;
+	for(int i=0;i<n;i+=bdim)
+	{
+		a1 = cuda_compute_inverse_eukleides(a1, modul);
+		a1++;
+		
+	}
+}
+
+void test_inverse(int N, unsigned int modul)
+{
+	if(num_of_gpu<=0) return;
+	cudaProfilerStart();
+	int num_of_threads=1;
+	
+	cuda_start_measuring();
+	// vypocet
+	test_inverse_kernel<<<1,num_of_threads>>>(N, modul);
 
 	cudaThreadSynchronize();
 	cuda_stop_measuring();
