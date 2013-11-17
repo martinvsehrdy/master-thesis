@@ -735,11 +735,15 @@ __global__ void cuda_GJE_radky_kernel(int N, unsigned int modul, unsigned int* m
 			unsigned long long a;
 			if(i==N) a = m_prava_strana[q];
 			else a = m_matice[cuda_get_index(i, q, N)];
-			a *= a_pq_inv;
-			a %= modul;
+			if( zpusob & ZPUSOB_S_DELENIM )
+			{
+				a *= a_pq_inv;
+				a %= modul;
+			}
 			sh_mem[i] = (unsigned int)a;
 			i+=bdim;
 		}
+
 		__syncthreads();
 	// \ENDFOR
 	// \FOR{$y$ := $1$ do $N$}
@@ -754,9 +758,12 @@ __global__ void cuda_GJE_radky_kernel(int N, unsigned int modul, unsigned int* m
 				// \IF{$y$ == $q$}
 					if(i == q)	// ma na starosti pivotni radek => pouze uklada do globalni
 					{
-					// \STATE ulozit do globalni pameti prvek $[x;y]=[x;q]$
-						if(iX==N) m_prava_strana[i] = sh_mem[iX];
-						else m_matice[cuda_get_index(iX, i, N)] = sh_mem[iX];
+						if( zpusob & ZPUSOB_S_DELENIM )
+						{
+						// \STATE ulozit do globalni pameti prvek $[x;y]=[x;q]$
+							if(iX==N) m_prava_strana[i] = sh_mem[iX];
+							else m_matice[cuda_get_index(iX, i, N)] = sh_mem[iX];
+						}
 				// \ELSE
 					}else
 					{
@@ -778,6 +785,15 @@ __global__ void cuda_GJE_radky_kernel(int N, unsigned int modul, unsigned int* m
 					}
 				// \ENDIF
 			// \ENDFOR
+				}
+				if( !(zpusob & ZPUSOB_S_DELENIM) && (i<ipivot) )
+				{
+					// uprava diagonalniho prvku kdyz upravuju bez deleni a lezi v uz spracovanym sloupci
+					unsigned long long a_xy = m_matice[cuda_get_index(i, i, N)];
+					a_xy *= a_pq;
+					a_xy %=modul;
+					//cout << "  " << a_xy << " * " << a_pp << " - " << a_xp << " * " << a_py << endl;
+					m_matice[cuda_get_index(i, i, N)] = (unsigned int)a_xy;
 				}
 				i+=bdim;
 			}
