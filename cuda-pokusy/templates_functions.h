@@ -95,6 +95,30 @@ int save_matrix(int N, TYPE* matice, TYPE* prava_strana, char* filename)
 }
 
 template<class TYPE>
+int save_vys(int N, TYPE* prava_strana, char* filename)
+{
+	/*fstream file;
+	file.open(filename, fstream::out);
+	if(!file.is_open()) return 1;*/
+	FILE* f=fopen(filename, "w");
+	 if (f==NULL) return 1;
+	//file << N << endl;
+	fprintf(f, "%d\n", N);
+	
+	for(int y=0;y<N;y++)
+	{
+		if(prava_strana!=NULL)
+		{
+			//file << "| " << prava_strana[y];
+			fprintf(f, "| %u", prava_strana[y]);
+		}
+	}
+	//file.close();
+	fclose(f);
+	return 0;
+}
+
+template<class TYPE>
 void vypsat_mat(int nx, int ny, TYPE* matice, TYPE* prava_strana)
 {
 	//cout << endl;

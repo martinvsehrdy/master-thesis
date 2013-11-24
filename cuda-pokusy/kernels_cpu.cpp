@@ -933,3 +933,117 @@ int get_index(int X, int Y, int N)	// SLOUPEC, RADEK
 {
 	return Y*N+X;
 }
+
+void GJE_radky_kernel(int N, unsigned int modul, int ipivot, unsigned int* m_matice, unsigned int* m_prava_strana, 
+						int* pivot_radek, unsigned int* inverse, unsigned int zpusob)
+{
+	int tid=0;
+	int bdim=1;
+	int bid=1;
+	int gdim=2;
+		fstream fout;
+		fout.open("log", fstream::out);
+	for(bid=1;0<=bid;bid--)
+	{
+		int bN=(int)ceil((double)(N+1)/gdim);
+		// TODO: velikost sh_mem udelat konstantni - zmerit rychlost vypoctu v zavislosti na teto velikosti
+		unsigned int sh_mem[10];	// size_sh_mem = N
+		//__shared__ int sh_q;	// CUDA: 'q' sdilene, pak si musi kazde vlakno vzit svou kopii
+		//__shared__ unsigned int sh_a_pq_inv;
+	
+	// \STATE \COMMENT{priprava pivotniho radku}
+	// \STATE nacist prvek $[p;q]$ do sdilene pameti
+		/*if( tid==0 )
+		{
+			sh_q = pivot_radek[0];
+			sh_a_pq_inv = inverse[0];
+		}
+		__syncthreads();*/
+		int q = pivot_radek[0];
+		unsigned int a_pq_inv=inverse[0];
+
+	// \FOR{$x$ := $p+1$ do $N$}
+		int iX=tid;
+		while(iX<bN)
+		{
+			int gX=iX+bid*bN;
+			if( gX>=ipivot && gX<=N )
+			{
+			// \STATE nacist, vydelit a ulozit do sdilene pameti
+				unsigned long long a;
+				if(gX==N) a = m_prava_strana[q];
+				else a = m_matice[get_index(gX, q, N)];
+				a *= a_pq_inv;
+				a %= modul;
+				sh_mem[iX] = (unsigned int)a;
+			}
+			iX+=bdim;
+		}
+		//__syncthreads();
+	// \ENDFOR
+	// \FOR{$y$ := $1$ do $N$}
+		int iY=tid;	// prochazi pres Y, kazde vlakno samostatny radek
+		while(iY<N)
+		{
+			unsigned int a_py = m_matice[get_index(ipivot, iY, N)];
+			fout << "unsigned int a_py = m_matice[get_index(" << ipivot <<", " << iY <<" , " << N << ")];" << endl;
+		// \FOR{$x$ := $p+1$ do $N$}
+			for(int iX=0;iX<bN;iX++)
+			{
+				int gX=iX+bid*bN;
+				if( gX>=ipivot && gX<=N )
+				{
+				// \IF{$y$ == $q$}
+					if(iY == q)	// ma na starosti pivotni radek => pouze uklada do globalni
+					{
+					// \STATE ulozit do globalni pameti prvek $[x;y]=[x;q]$
+						if(gX==N)
+						{
+							m_prava_strana[iY] = sh_mem[iX];
+							fout << "m_prava_strana[" << iY << "] = sh_mem[" << iX << "];" << endl;
+						}else
+						{
+							m_matice[get_index(gX, iY, N)] = sh_mem[iX];
+							fout << "m_matice[get_index("<< gX << ", " << iY << ", " << N << ")] = sh_mem[" << iX << "];" << endl;
+						}
+				// \ELSE
+					}else
+					{
+					// \STATE upravit prvek $[x;y]$ stejne jako pri nulovani prvku $[p;y]$
+						unsigned int a_xy;
+						if(gX==N)
+						{
+							a_xy = m_prava_strana[iY];
+							fout << "a_xy = m_prava_strana[" << iY << "];" << endl;
+						}else
+						{
+							a_xy = m_matice[get_index(gX, iY, N)];
+							fout << "a_xy = m_matice[get_index(" << gX << ", " << iY << ", " << N << ")];" << endl;
+						}
+						unsigned int a_xp = sh_mem[iX];
+						fout << "unsigned int a_xp = sh_mem[" << iX << "];" << endl;
+						//cout << "  " << a_xy << " * " << a_pp << " - " << a_xp << " * " << a_py << endl;
+						
+						a_xy = elem_uprava_s_delenim(modul, a_xy, a_xp, a_py);
+						
+						if(gX==N)
+						{
+							m_prava_strana[iY] = a_xy;
+							fout << "m_prava_strana[" << iY << "] = a_xy;" << endl;
+						}else
+						{
+							m_matice[get_index(gX, iY, N)] = a_xy;
+							fout << "m_matice[get_index(" << gX << ", " << iY << ", " << N << ")] = a_xy;" << endl;
+						}
+					}
+				}
+			// \ENDIF
+		// \ENDFOR
+			}
+			iY+=bdim;
+		}
+	// \ENDFOR
+		vypsat_mat(N, N, m_matice, m_prava_strana);
+	}
+	fout.close();
+}

@@ -7,6 +7,8 @@ static unsigned int gpu_time;
 static int num_of_gpu=0;
 static cudaDeviceProp gpu_property;
 
+#define SHARED_SIZE 0
+
 /* kernels.cu */
 void print_gpus_info(void);
 void print_cuda_err(cudaError_t cudaErr);

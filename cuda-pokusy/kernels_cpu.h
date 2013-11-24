@@ -13,6 +13,7 @@ int get_index(int X, int Y, int N);
 void GJE_podmatice(int N, unsigned int modul, unsigned int* m_matice, unsigned int* m_prava_strana, unsigned int zpusob);
 void GJE_radky(int N, unsigned int modul, unsigned int* m_matice, unsigned int* m_prava_strana, unsigned int zpusob);
 //void copy_podmatice(int N, int sx, int sy, int Sx, int Sy, unsigned int* mat_A, unsigned int* mat_B, unsigned int* prava_str, int typ_podmatice, int copy_to);
+void GJE_radky_kernel(int N, unsigned int modul, int ipivot, unsigned int* m_matice, unsigned int* m_prava_strana, int* pivot_radek, unsigned int* inverse, unsigned int zpusob);
 
 #endif /* _KERNELS_CPU_H_ */
 

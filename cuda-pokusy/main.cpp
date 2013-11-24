@@ -13,7 +13,7 @@
 
 using namespace std;
 
-#define POC_OPAKOVANI 10
+#define POC_OPAKOVANI 1
 //extern unsigned int measured_time;
 
 void statistic(list<float> l, float* quartal1, float* quartal2, float* quartal3, float* avg)
@@ -68,7 +68,7 @@ int main(int argc, char** argv)
 // argv[0] <N> <modul>
 {
 	stringstream ss;
-	int N=100;
+	int N=300;
 	unsigned int modul=0x10000003; //(~(unsigned int)0);
 	//modul = 0x1003;	// 4099 je prvocislo
 	/*cout << "Modul = " << modul << endl;
@@ -85,22 +85,26 @@ int main(int argc, char** argv)
 	ss.clear();
 	ss << "outmat-for";
 	//ss << N;
-	save_matrix(N, M, Pfor, (char*)ss.str().c_str());
+	save_vys<unsigned int>(N, Pfor, (char*)ss.str().c_str());
 
 	hilbert_matrix(N, M, P);
 	vypsat_mat(N, N, M, P);
 	init_gpu_compute();
-	//cuda_GJE_podmatice(N, modul, M, P, settings);
-	unsigned int* S=new unsigned int[N*N+N];
-	copy_podmatice(N, 0, 0, N+1, N, S, M, P, COPY_MAT_B_GLOB_TO_A_SH);
-	cuda_GJE_global(N, modul, S, settings);
-	copy_podmatice(N, 0, 0, N+1, N, S, M, P, COPY_MAT_A_SH_TO_B_GLOB);
-	free(S);
+	int q=0;
+	unsigned int inv=compute_inverse_eukleides(M[0], modul);
+	//GJE_radky_kernel(N, modul, 0, M, P, &q, &inv, settings);
+	cuda_GJE_radky(N, modul, M, P, settings);
+
+	//unsigned int* S=new unsigned int[N*N+N];
+	//copy_podmatice(N, 0, 0, N+1, N, S, M, P, COPY_MAT_B_GLOB_TO_A_SH);
+	//cuda_GJE_global(N, modul, S, settings);
+	//copy_podmatice(N, 0, 0, N+1, N, S, M, P, COPY_MAT_A_SH_TO_B_GLOB);
+	//free(S);
 	ss.str("");
 	ss.clear();
 	ss << "outmat-GJE";
 	//ss << N;
-	save_matrix(N, M, P, (char*)ss.str().c_str());
+	save_vys(N, P, (char*)ss.str().c_str());
 	vypsat_mat(N, N, M, P);
 
 	bool v=true;
@@ -195,7 +199,7 @@ int main(int argc, char** argv)
 			ss.str("");
 			ss.clear();
 			ss << "outmatN" << N << "Z" << argv[2];
-			save_matrix(N, A, b, (char*)ss.str().c_str());
+			save_vys(N, b, (char*)ss.str().c_str());
 		}
 		times.push_back(tt);
 		sum += tt;
