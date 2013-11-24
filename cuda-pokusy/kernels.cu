@@ -165,7 +165,46 @@ __device__ unsigned int cuda_elem_uprava_s_delenim(unsigned int modul, unsigned 
 	}
 	return ((unsigned int)pom);
 }
-
+// elementarni uprava bez deleni
+__device__ unsigned int cuda_elem_uprava_bez_deleni1(unsigned int modul, unsigned int a_xy, unsigned int a_pp, unsigned int a_xp, unsigned int a_py)
+// \STATE $a_{xy} := a_{xy} \cdot a_pp - a_xp \cdot a_py$
+{
+	double p1 = (((double)a_xy) * ((double)a_pp)) - (((double)a_xp) * ((double)a_py));
+	double q = floor(p1/(double)modul);
+	double p2 = q*modul;
+	
+	return ((unsigned int)(p1-p2));
+}
+// elementarni uprava s delenim
+__device__ unsigned int cuda_elem_uprava_s_delenim1(unsigned int modul, unsigned int a_xy, unsigned int a_xp, unsigned int a_py)
+// \STATE $a_{xy} := a_xy - a_xp \cdot a_py$
+{
+	double p1 = ((double)a_xy) - (((double)a_xp) * ((double)a_py));
+	double q = floor(p1/(double)modul);
+	double p2 = q*modul;
+	
+	return ((unsigned int)(p1-p2));
+}
+// elementarni uprava bez deleni
+__device__ unsigned int cuda_elem_uprava_bez_deleni2(unsigned int modul, unsigned int a_xy, unsigned int a_pp, unsigned int a_xp, unsigned int a_py)
+// \STATE $a_{xy} := a_{xy} \cdot a_pp - a_xp \cdot a_py$
+{
+	double p1 = __fma_rd((double)a_xp, -((double)a_py), __dmul_rn( (double)a_xy, (double)a_pp ));
+	double q = __double2uint_rd( p1/(double)modul );
+	double p2 = __dmul_rn(q, (double)modul);
+	
+	return ((unsigned int)(p1-p2));
+}
+// elementarni uprava s delenim
+__device__ unsigned int cuda_elem_uprava_s_delenim2(unsigned int modul, unsigned int a_xy, unsigned int a_xp, unsigned int a_py)
+// \STATE $a_{xy} := a_xy - a_xp \cdot a_py$
+{
+	double p1 = __fma_rd((double)a_xp, -((double)a_py), (double)a_xy);
+	double q = __double2uint_rd( p1/(double)modul );
+	double p2 = __dmul_rn(q, (double)modul);
+	
+	return ((unsigned int)(p1-p2));
+}
 /* nacte/ulozi podmatici z globalni p. do sdilene nebo zpet
  * Sx, Sy - velikost podmatice, mela by se vejit do sdilene pameti
  * sx, sy - souradnice zvolene podmatice v matici, sx \in [0; ceil(N/Sx)]
@@ -814,8 +853,7 @@ __global__ void cuda_GJE_radky_kernel(int N, unsigned int modul, int ipivot, uns
 			unsigned long long a;
 			if(gX==N) a = m_prava_strana[q];
 			else a = m_matice[cuda_get_index(gX, q, N)];
-			a *= a_pq_inv;
-			a %= modul;
+			a = cuda_multiply_add_modulo(modul, a, a_pq_inv, 0);
 #if defined(SHARED_SIZE) && SHARED_SIZE>0
 			sh_mem[iX] = (unsigned int)a;
 #else
@@ -1062,65 +1100,139 @@ void cuda_GJE_global(int N, unsigned int modul, unsigned int* m_matice, unsigned
 	cudaProfilerStop();
 }
 
-__global__ void test_elem_uprava_kernel0(int n, unsigned int modul)
+__global__ void test_elem_uprava_kernel_bez(int n, unsigned int modul)
 {
-	int i=threadIdx.x;
+	int bdim=blockDim.x;
 	unsigned int a1=1298161;
 	unsigned int a2;
-	while(i<n)
+	unsigned int a3=a1;
+	for(int i=0;i<n;i+=bdim)
 	{
-		a2=a1;
+		a3=a1;
 		a1=cuda_elem_uprava_bez_deleni(modul, a1, 1293001, a2, 1269239);
-		i+=blockDim.x;
+		a2=a3;
 	}
 }
-__global__ void test_elem_uprava_kernel1(int n, unsigned int modul)
+__global__ void test_elem_uprava_kernel_s(int n, unsigned int modul)
 {
-	int i=threadIdx.x;
+	int bdim=blockDim.x;
 	unsigned int a1=1298161;
 	unsigned int a2;
-	while(i<n)
+	unsigned int a3=a1;
+	for(int i=0;i<n;i+=bdim)
 	{
-		a2=a1;
-		cuda_elem_uprava_s_delenim(modul, a1, a2, 1269239);
-		i+=blockDim.x;
+		a3=a1;
+		a1=cuda_elem_uprava_s_delenim(modul, a1, a2, 1269239);
+		a2=a3;
 	}
 }
+__global__ void test_elem_uprava_kernel_bez1(int n, unsigned int modul)
+{
+	int bdim=blockDim.x;
+	unsigned int a1=1298161;
+	unsigned int a2;
+	unsigned int a3=a1;
+	for(int i=0;i<n;i+=bdim)
+	{
+		a3=a1;
+		a1=cuda_elem_uprava_bez_deleni1(modul, a1, 1293001, a2, 1269239);
+		a2=a3;
+	}
+}
+__global__ void test_elem_uprava_kernel_s1(int n, unsigned int modul)
+{
+	int bdim=blockDim.x;
+	unsigned int a1=1298161;
+	unsigned int a2;
+	unsigned int a3=a1;
+	for(int i=0;i<n;i+=bdim)
+	{
+		a3=a1;
+		a1=cuda_elem_uprava_s_delenim1(modul, a1, a2, 1269239);
+		a2=a3;
+	}
+}
+__global__ void test_elem_uprava_kernel_bez2(int n, unsigned int modul)
+{
+	int bdim=blockDim.x;
+	unsigned int a1=1298161;
+	unsigned int a2;
+	unsigned int a3=a1;
+	for(int i=0;i<n;i+=bdim)
+	{
+		a3=a1;
+		a1=cuda_elem_uprava_bez_deleni2(modul, a1, 1293001, a2, 1269239);
+		a2=a3;
+	}
+}
+__global__ void test_elem_uprava_kernel_s2(int n, unsigned int modul)
+{
+	int bdim=blockDim.x;
+	unsigned int a1=1298161;
+	unsigned int a2;
+	unsigned int a3=a1;
+	for(int i=0;i<n;i+=bdim)
+	{
+		a3=a1;
+		a1=cuda_elem_uprava_s_delenim2(modul, a1, a2, 1269239);
+		a2=a3;
+	}
+}
+
 
 void test_elem_uprava(int N, unsigned int modul, unsigned int zpusob)
 {
 	if(num_of_gpu<=0) return;
 	cudaProfilerStart();
-	int num_of_threads;
-	switch( ((zpusob & ZPUSOB_VLAKNA) >> 2) )
-	{
-	case 0:
-		num_of_threads=1;
-		break;
-	case 1:
-		num_of_threads=32;
-		break;
-	case 2:
-		num_of_threads=128;
-		break;
-	case 3:
-		num_of_threads = min( 32*((int)ceil((float)(N+1)/32.0)), gpu_property.maxThreadsPerBlock );
-		break;
-	}
 
 	cuda_start_measuring();
 	// vypocet
-	switch( (zpusob & 0x0003) )
+	if( (zpusob & ZPUSOB_S_DELENIM) )
 	{
-	case 0: test_elem_uprava_kernel0<<<1,num_of_threads>>>(N, modul);
-		break;
-	case 1: test_elem_uprava_kernel1<<<1,num_of_threads>>>(N, modul);
-		break;
-
+		test_elem_uprava_kernel_s<<<1,1>>>(N, modul);
+	}else
+	{
+		test_elem_uprava_kernel_bez<<<1,1>>>(N, modul);
 	}
-
 	cudaThreadSynchronize();
 	cuda_stop_measuring();
-	
+	cudaProfilerStop();
+}
+
+void test_elem_uprava1(int N, unsigned int modul, unsigned int zpusob)
+{
+	if(num_of_gpu<=0) return;
+	cudaProfilerStart();
+
+	cuda_start_measuring();
+	// vypocet
+	if( (zpusob & ZPUSOB_S_DELENIM) )
+	{
+		test_elem_uprava_kernel_s1<<<1,1>>>(N, modul);
+	}else
+	{
+		test_elem_uprava_kernel_bez1<<<1,1>>>(N, modul);
+	}
+	cudaThreadSynchronize();
+	cuda_stop_measuring();
+	cudaProfilerStop();
+}
+
+void test_elem_uprava2(int N, unsigned int modul, unsigned int zpusob)
+{
+	if(num_of_gpu<=0) return;
+	cudaProfilerStart();
+
+	cuda_start_measuring();
+	// vypocet
+	if( (zpusob & ZPUSOB_S_DELENIM) )
+	{
+		test_elem_uprava_kernel_s2<<<1,1>>>(N, modul);
+	}else
+	{
+		test_elem_uprava_kernel_bez2<<<1,1>>>(N, modul);
+	}
+	cudaThreadSynchronize();
+	cuda_stop_measuring();
 	cudaProfilerStop();
 }

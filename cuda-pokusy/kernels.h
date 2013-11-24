@@ -18,6 +18,8 @@ void cuda_GJE_podmatice(int N, unsigned int modul, unsigned int* m_matice, unsig
 void cuda_GJE_radky(int N, unsigned int modul, unsigned int* m_matice, unsigned int* m_prava_strana, unsigned int zpusob);
 void cuda_GJE_global(int N, unsigned int modul, unsigned int* m_matice, unsigned int zpusob);
 void test_elem_uprava(int N, unsigned int modul, unsigned int zpusob);
+void test_elem_uprava1(int N, unsigned int modul, unsigned int zpusob);
+void test_elem_uprava2(int N, unsigned int modul, unsigned int zpusob);
 void test_inverse(int N, unsigned int modul);
 
 

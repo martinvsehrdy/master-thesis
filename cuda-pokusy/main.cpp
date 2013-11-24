@@ -13,7 +13,7 @@
 
 using namespace std;
 
-#define POC_OPAKOVANI 1
+#define POC_OPAKOVANI 10
 //extern unsigned int measured_time;
 
 void statistic(list<float> l, float* quartal1, float* quartal2, float* quartal3, float* avg)
@@ -68,59 +68,66 @@ int main(int argc, char** argv)
 // argv[0] <N> <modul>
 {
 	stringstream ss;
-	int N=300;
+	int N=100;
 	unsigned int modul=0x10000003; //(~(unsigned int)0);
-	//modul = 0x1003;	// 4099 je prvocislo
-	/*cout << "Modul = " << modul << endl;
-	unsigned int* M=new unsigned int[N*N];
-	unsigned int* P=new unsigned int[N];
-	unsigned int* Pfor=new unsigned int[N];
-	for(int y=0;y<N;y++) for(int x=0;x<N;x++) M[get_index(x, y, N)]=10*x+y;
-	for(int y=0;y<N;y++) P[y]=800+y;
-	unsigned int settings = strtol("101111", NULL, 2);
-
-	hilbert_matrix(N, M, Pfor);
-	gauss_jordan_elim_for(N, modul, M, Pfor, settings);
-	ss.str("");
-	ss.clear();
-	ss << "outmat-for";
-	//ss << N;
-	save_vys<unsigned int>(N, Pfor, (char*)ss.str().c_str());
-
-	hilbert_matrix(N, M, P);
-	vypsat_mat(N, N, M, P);
-	init_gpu_compute();
-	int q=0;
-	unsigned int inv=compute_inverse_eukleides(M[0], modul);
-	//GJE_radky_kernel(N, modul, 0, M, P, &q, &inv, settings);
-	cuda_GJE_radky(N, modul, M, P, settings);
-
-	//unsigned int* S=new unsigned int[N*N+N];
-	//copy_podmatice(N, 0, 0, N+1, N, S, M, P, COPY_MAT_B_GLOB_TO_A_SH);
-	//cuda_GJE_global(N, modul, S, settings);
-	//copy_podmatice(N, 0, 0, N+1, N, S, M, P, COPY_MAT_A_SH_TO_B_GLOB);
-	//free(S);
-	ss.str("");
-	ss.clear();
-	ss << "outmat-GJE";
-	//ss << N;
-	save_vys(N, P, (char*)ss.str().c_str());
-	vypsat_mat(N, N, M, P);
-
-	bool v=true;
-	for(int y=0;y<N;y++)
+	modul = 0x40000003;	// nejmensi prvocislo v [2^30+1;2^31-1]
+	modul = 0x7FFFFFED;	// nejvetsi prvocislo v [2^30+1;2^31-1]
+	unsigned int zpusob=0;
+	if(argc>2)
 	{
-		if( Pfor[y]!=P[y] )
+		N=atoi(argv[1]);
+		zpusob=atoi(argv[2]);
+	}else
+	{
+		cout << "#Program spustte ve tvaru:" << argv[0] << " <N> <zpusob zpracovani>" << endl;
+		cout << "#zpusob zpracovani: 1 - elementarni uprava s delenim" << endl;
+		cout << "#                   2 - elementarni uprava bez deleni" << endl;
+		cout << "#                   3 - pocitani inverze" << endl;
+		cout << "#                   4 - s delenim, double" << endl;
+		cout << "#                   5 - bez deleni, double" << endl;
+		cout << "#                   6 - s delenim, __fma_rd" << endl;
+		cout << "#                   7 - bez deleni, __fma_rd" << endl;
+		cout << "#Vystup: <pocet operaci> <casy s modulem 0x40000003> <casy s modulem 0x7FFFFFED>" << endl;
+		cout << "                  (<celkovy cas> <cas na jednu operaci>)" << endl;
+		return 0;
+	}
+	init_gpu_compute();
+
+	cout << N << "\t";
+	for(int i=0;i<2;i++)
+	{
+		if(i==0) modul = 0x40000003;
+		else modul = 0x7FFFFFED;
+		switch(zpusob)
 		{
-			v=false;
+		case 1:
+			test_elem_uprava(N, modul, ZPUSOB_S_DELENIM);
+			break;
+		case 2:
+			test_elem_uprava(N, modul, 0x0000);
+			break;
+		case 3:
+			//test_inverse(N, modul);
+			break;
+		case 4:
+			test_elem_uprava1(N, modul, ZPUSOB_S_DELENIM);
+			break;
+		case 5:
+			test_elem_uprava1(N, modul, 0x0000);
+			break;
+		case 6:
+			test_elem_uprava2(N, modul, ZPUSOB_S_DELENIM);
+			break;
+		case 7:
+			test_elem_uprava2(N, modul, 0x0000);
 			break;
 		}
+		float tt=cuda_get_measured_time();
+		cout << tt << "\t" << (tt/N) << "\t";
 	}
-	if( v ) cout << endl << "SPRAVNE" << endl;
-
-	delete M;
-	delete P;
-	delete Pfor;
+	cout << endl;
+	
+	
 #ifdef _DEBUG
 	cin.get();
 #else
@@ -199,7 +206,7 @@ int main(int argc, char** argv)
 			ss.str("");
 			ss.clear();
 			ss << "outmatN" << N << "Z" << argv[2];
-			save_vys(N, b, (char*)ss.str().c_str());
+			save_matrix(N, A, b, (char*)ss.str().c_str());
 		}
 		times.push_back(tt);
 		sum += tt;
