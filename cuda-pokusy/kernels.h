@@ -7,7 +7,7 @@ static unsigned int gpu_time;
 static int num_of_gpu=0;
 static cudaDeviceProp gpu_property;
 
-#define SHARED_SIZE 0
+#define SHARED_SIZE 1024
 
 /* kernels.cu */
 void print_gpus_info(void);
@@ -21,6 +21,7 @@ void test_elem_uprava(int N, unsigned int modul, unsigned int zpusob);
 void test_elem_uprava1(int N, unsigned int modul, unsigned int zpusob);
 void test_elem_uprava2(int N, unsigned int modul, unsigned int zpusob);
 void test_inverse(int N, unsigned int modul);
+void test_GJE_radky(int N, unsigned int zpusob);
 
 
 #endif /* _KERNELS_CU_ */

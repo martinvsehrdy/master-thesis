@@ -1236,3 +1236,54 @@ void test_elem_uprava2(int N, unsigned int modul, unsigned int zpusob)
 	cuda_stop_measuring();
 	cudaProfilerStop();
 }
+void test_GJE_radky(int N, unsigned int zpusob)
+{
+	if(num_of_gpu<=0) return;
+	unsigned int modul = 0x40000003;
+	unsigned int *g_matice, *g_prava_strana;
+	cudaProfilerStart();
+	cudaMalloc((void**)&g_matice, (N*N)*sizeof(unsigned int));
+	cudaMalloc((void**)&g_prava_strana, N*sizeof(unsigned int));
+	unsigned int* g_inverse;
+	cudaMalloc((void**)&g_inverse, sizeof(unsigned int));
+	int* g_pivot;
+	cudaMalloc((void**)&g_pivot, sizeof(int));
+	cuda_start_measuring();
+	int num_of_blocks;
+#if defined(SHARED_SIZE) && SHARED_SIZE>0
+	num_of_blocks = (int)ceil((double)(N+1)/SHARED_SIZE);
+#else
+	num_of_blocks = gpu_property.multiProcessorCount;
+#endif
+	// N+1 vlaken = N radku + 1 vl na pocitani inverze
+	int num_of_threads = min( gpu_property.warpSize*((int)ceil((float)(N+1)/((float)gpu_property.warpSize))), gpu_property.maxThreadsPerBlock );
+	switch(zpusob)
+	{
+	case 8:
+		find_inverse<<<1,1>>>(N, modul, 0, g_matice, g_pivot, g_inverse);
+		break;
+	case 9:
+		cuda_GJE_radky_kernel<<<num_of_blocks,num_of_threads>>>(N, modul, 0, g_matice, g_prava_strana, g_pivot, g_inverse, zpusob);
+		break;
+	case 10:
+		cuda_GJE_radky_kernel<<<num_of_blocks,num_of_threads>>>(N, modul, N/4, g_matice, g_prava_strana, g_pivot, g_inverse, zpusob);
+		break;
+	case 11:
+		cuda_GJE_radky_kernel<<<num_of_blocks,num_of_threads>>>(N, modul, N/2, g_matice, g_prava_strana, g_pivot, g_inverse, zpusob);
+		break;
+	case 12:
+		cuda_GJE_radky_kernel<<<num_of_blocks,num_of_threads>>>(N, modul, 3*N/4, g_matice, g_prava_strana, g_pivot, g_inverse, zpusob);
+		break;
+	case 13:
+		cuda_GJE_radky_kernel<<<num_of_blocks,num_of_threads>>>(N, modul, N-1, g_matice, g_prava_strana, g_pivot, g_inverse, zpusob);
+		break;
+	}
+	cudaThreadSynchronize();
+	
+	cuda_stop_measuring();
+
+	cudaFree(g_matice);
+	cudaFree(g_prava_strana);
+
+	cudaProfilerStop();
+}

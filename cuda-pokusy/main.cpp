@@ -80,52 +80,24 @@ int main(int argc, char** argv)
 	}else
 	{
 		cout << "#Program spustte ve tvaru:" << argv[0] << " <N> <zpusob zpracovani>" << endl;
-		cout << "#zpusob zpracovani: 1 - elementarni uprava s delenim" << endl;
-		cout << "#                   2 - elementarni uprava bez deleni" << endl;
-		cout << "#                   3 - pocitani inverze" << endl;
-		cout << "#                   4 - s delenim, double" << endl;
-		cout << "#                   5 - bez deleni, double" << endl;
-		cout << "#                   6 - s delenim, __fma_rd" << endl;
-		cout << "#                   7 - bez deleni, __fma_rd" << endl;
-		cout << "#Vystup: <pocet operaci> <casy s modulem 0x40000003> <casy s modulem 0x7FFFFFED>" << endl;
-		cout << "                  (<celkovy cas> <cas na jednu operaci>)" << endl;
+		cout << "#zpusob zpracovani: 8 - find_inverse" << endl;
+		cout << "#                   9 - GJE_radky_kernel, ipivot=0" << endl;
+		cout << "#                  10 - GJE_radky_kernel, ipivot=1/4 * N" << endl;
+		cout << "#                  11 - GJE_radky_kernel, ipivot=1/2 * N" << endl;
+		cout << "#                  12 - GJE_radky_kernel, ipivot=3/4 * N" << endl;
+		cout << "#                  13 - GJE_radky_kernel, ipivot= N-1" << endl;
+		cout << "#Vystup: <N> <cas vypoctu>" << endl;
 		return 0;
 	}
 	init_gpu_compute();
 
 	cout << N << "\t";
-	for(int i=0;i<2;i++)
-	{
-		if(i==0) modul = 0x40000003;
-		else modul = 0x7FFFFFED;
-		switch(zpusob)
-		{
-		case 1:
-			test_elem_uprava(N, modul, ZPUSOB_S_DELENIM);
-			break;
-		case 2:
-			test_elem_uprava(N, modul, 0x0000);
-			break;
-		case 3:
-			//test_inverse(N, modul);
-			break;
-		case 4:
-			test_elem_uprava1(N, modul, ZPUSOB_S_DELENIM);
-			break;
-		case 5:
-			test_elem_uprava1(N, modul, 0x0000);
-			break;
-		case 6:
-			test_elem_uprava2(N, modul, ZPUSOB_S_DELENIM);
-			break;
-		case 7:
-			test_elem_uprava2(N, modul, 0x0000);
-			break;
-		}
-		float tt=cuda_get_measured_time();
-		cout << tt << "\t" << (tt/N) << "\t";
-	}
-	cout << endl;
+	modul = 0x40000003;
+	
+	test_GJE_radky(N, zpusob);
+	
+	float tt=cuda_get_measured_time();
+	cout << tt << endl;
 	
 	
 #ifdef _DEBUG
