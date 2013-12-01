@@ -53,13 +53,14 @@ void stop_measuring()
 // CUDA
 float cuda_get_measured_time()
 {
-	float elapsedTime = -1.0;
+	float elapsedTime;
 	cudaEventElapsedTime(&elapsedTime,cuda_start,cuda_stop);
 	return elapsedTime;
 }
 void cuda_start_measuring()
 {
 	cudaEventRecord(cuda_start,0);
+	// cudaSuccess, cudaErrorInvalidValue, cudaErrorInitializationError, cudaErrorInvalidResourceHandle, cudaErrorLaunchFailure
 }
 void cuda_stop_measuring()
 {

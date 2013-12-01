@@ -13,7 +13,7 @@
 
 using namespace std;
 
-#define POC_OPAKOVANI 10
+#define POC_OPAKOVANI 1
 //extern unsigned int measured_time;
 
 void statistic(list<float> l, float* quartal1, float* quartal2, float* quartal3, float* avg)
@@ -64,69 +64,130 @@ void statistic(list<float> l, float* quartal1, float* quartal2, float* quartal3,
 	if(poc>0) *quartal3/=poc;
 	
 }
-int main(int argc, char** argv)
-// argv[0] <N> <modul>
+
+// spocita na CPU a na GPU (lib. metoda) a porovna vysledky
+void main1(int argc, char** argv, int N, unsigned int settings)
 {
 	stringstream ss;
-	int N=1000;
-	unsigned int modul=0x10000003; //(~(unsigned int)0);
-	modul = 0x40000003;	// nejmensi prvocislo v [2^30+1;2^31-1]
-	modul = 0x7FFFFFED;	// nejvetsi prvocislo v [2^30+1;2^31-1]
-	unsigned int zpusob=9;
-	
-	/*modul = 4099;
-	unsigned int* M=new unsigned int[N*N];
-	unsigned int* Pfor=new unsigned int[N];
-	unsigned int* P=new unsigned int[N];
-	hilbert_matrix(N, M, Pfor);
-	gauss_jordan_elim_for(N, modul, M, Pfor, ZPUSOB_S_DELENIM);
-
-	hilbert_matrix(N, M, P);
-	int pivot_radek = 0;
-	unsigned int inverse = 10;
-
-	GJE_radky_kernel(N, modul, 0, M, P, &pivot_radek, &inverse, zpusob);
-	delete M;
-	delete P;
-	return 0;
-	//*/
-
 	if(argc>2)
 	{
 #ifndef _DEBUG
 		N=atoi(argv[1]);
-		zpusob=atoi(argv[2]);
 #endif
+	}
+	unsigned int modul=0x10000003; //(~(unsigned int)0);
+	modul = 0x1003;	// 4099 je prvocislo
+	cout << "Modul = " << modul << endl;
+
+	unsigned int* M=new unsigned int[N*N];
+	unsigned int* P=new unsigned int[N];
+	unsigned int* Pfor=new unsigned int[N];
+
+	hilbert_matrix(N, M, Pfor);
+	gauss_jordan_elim_for(N, modul, M, Pfor, settings | ZPUSOB_S_DELENIM);
+	ss.str("");
+	ss.clear();
+	ss << "outmat-for";
+	//ss << N;
+	save_vys<unsigned int>(N, Pfor, (char*)ss.str().c_str());
+
+	hilbert_matrix(N, M, P);
+	vypsat_mat(N, N, M, P);
+	init_gpu_compute();
+	cuda_GJE_radky(N, modul, M, P, settings);
+
+	ss.str("");
+	ss.clear();
+	ss << "outmat-GJE";
+	//ss << N;
+	save_vys<unsigned int>(N, P, (char*)ss.str().c_str());
+	vypsat_mat<unsigned int>(N, N, M, P);
+
+	bool v=true;
+	for(int y=0;y<N;y++)
+	{
+		if( Pfor[y]!=P[y] )
+	{
+			v=false;
+			break;
+	}
+	}
+	if( v ) cout << endl << "SPRAVNE" << endl;
+	else cout << endl << "SPATNE" << endl;
+
+	delete M;
+	delete P;
+	delete Pfor;
+#ifdef _DEBUG
+	cin.get();
+#endif
+}
+// zmeri cas vypoctu jednoho kroku = nulovani jednoho sloupce, ipivot
+void main2(int argc, char** argv)
+{
+	int N=200;
+	unsigned int zpusob=0;
+	unsigned int modul=0x10000003; //(~(unsigned int)0);
+	modul = 0x40000003;	// nejmensi prvocislo v [2^30+1;2^31-1]
+	modul = 0x7FFFFFED;	// nejvetsi prvocislo v [2^30+1;2^31-1]
+	if(argc>2)
+	{
+
+		N=atoi(argv[1]);
+		zpusob=atoi(argv[2]);
 	}else
 	{
-		cout << "#Program spustte ve tvaru:" << argv[0] << " <N> <zpusob zpracovani>" << endl;
+		cout << "#Program spustte ve tvaru:" << argv[0] << " <N> <zpusob zpracovani> [-DG]" << endl;
 		cout << "#zpusob zpracovani: 8 - find_inverse" << endl;
 		cout << "#                   9 - GJE_radky_kernel, ipivot=0" << endl;
 		cout << "#                  10 - GJE_radky_kernel, ipivot=1/4 * N" << endl;
 		cout << "#                  11 - GJE_radky_kernel, ipivot=1/2 * N" << endl;
 		cout << "#                  12 - GJE_radky_kernel, ipivot=3/4 * N" << endl;
 		cout << "#                  13 - GJE_radky_kernel, ipivot= N-1" << endl;
-		cout << "#Vystup: <N> <cas vypoctu>" << endl;
-		return 0;
+		cout << "#    G - vlakno zpracovava sloupec matice" << endl;
+		cout << "#    D - elementarni uprava bude v realnych cislech s CUDA funkcema" << endl;
+		cout << "#Vystup: <N> <zpusob> <shared_size> <cas vypoctu> <poc_bloku> <poc_vlaken> <gd>" << endl;
+		return;
+	}
+	for(int i=1;i<argc;i++)
+	{
+		if(argv[i][0]=='-')
+		{
+			int j=1;
+			while(argv[i][j]!=0)
+			{
+				switch(argv[i][j])
+				{
+				case 'g':
+				case 'G': zpusob |= ZPUSOB_GLOB_PRISTUP;
+					break;
+				case 'd':
+				case 'D': zpusob |= ZPUSOB_CUDA_UPRAVA;
+					break;
+				}
+				j++;
+			}
+		}
 	}
 	init_gpu_compute();
 
-	cout << N << "\t";
+	cout << N << "\t" << (zpusob & 0xFF) << "\t" << SHARED_SIZE << "\t";
 	modul = 0x40000003;
 	float tt=0;
 	int pocet=0;
-//	do{
 	test_GJE_radky(N, zpusob);
 	
 		tt+=cuda_get_measured_time();
-		pocet++;
 
-//	}while(tt<100.0 && pocet<1000);
 	int poc_vlaken;
 	int poc_bloku;
 	get_pocty(&poc_bloku, &poc_vlaken);
-	cout << (tt/pocet) << "\t" << tt << " / " << pocet << "\t";
+	cout << tt << "\t";
 	cout << poc_bloku << "\t" << poc_vlaken << "\t";
+	if(zpusob & ZPUSOB_GLOB_PRISTUP) cout << "G";
+	else cout << "g";
+	if(zpusob & ZPUSOB_CUDA_UPRAVA)  cout << "D";
+	else cout << "d";
 	cout << endl;
 	
 	
@@ -134,8 +195,18 @@ int main(int argc, char** argv)
 	cin.get();
 #else
 #endif
-	return 0; /*/
+}
+int main(int argc, char** argv)
+// argv[0] <N> <modul>
+{
+	
+	main2(argc, argv);
+	//main1(argc, argv, 50, (unsigned int)9 | ZPUSOB_GLOB_PRISTUP | ZPUSOB_CUDA_UPRAVA);
+	
+	 /*/
 	////////////////////////////////////////////////////////
+	int N=300;
+	unsigned int modul=0x10000003; //(~(unsigned int)0);
 	int zpusob=0;
 	if(argc>2)
 	{
@@ -208,7 +279,7 @@ int main(int argc, char** argv)
 			ss.str("");
 			ss.clear();
 			ss << "outmatN" << N << "Z" << argv[2];
-			save_matrix(N, A, b, (char*)ss.str().c_str());
+			save_vys(N, b, (char*)ss.str().c_str());
 		}
 		times.push_back(tt);
 		sum += tt;

@@ -106,12 +106,13 @@ __device__ unsigned int cuda_multiply_add_modulo(unsigned int modul, unsigned in
 	pom += c;
 	pom %= modul;
 	return (unsigned int)pom;
-
-	// float aritmetika
+}
+__device__ unsigned int cuda_multiply_add_modulo1(unsigned int modul, unsigned int a, unsigned int b, unsigned int c)
+// \STATE := (a * b + c) % modul
+{
 	double p1;
-	p1 = ((double)a) * ((double)b) + ((double)c);
 	// __fma_rd(a, b, c) k vypoctu (a * b + c)
-	//p1 = __fma_rd( (double)a, (double)b, (double)c );
+	p1 = __fma_rd( (double)a, (double)b, (double)c );
 
 	double q = floor( p1/modul );
 	double p2 = q * modul;
@@ -858,7 +859,13 @@ __global__ void cuda_GJE_radky_kernel(int N, unsigned int modul, int ipivot, uns
 			{
 				a = m_matice[cuda_get_index(gX, q, N)];
 			}
-			a = cuda_multiply_add_modulo(modul, a, a_pq_inv, 0);
+			if(zpusob & ZPUSOB_CUDA_UPRAVA)
+			{
+				a = cuda_multiply_add_modulo1(modul, a, a_pq_inv, 0);
+			}else
+			{
+				a = cuda_multiply_add_modulo(modul, a, a_pq_inv, 0);
+			}
 #if defined(SHARED_SIZE) && SHARED_SIZE>0
 			sh_mem[iX] = (unsigned int)a;
 #else
@@ -876,72 +883,104 @@ __global__ void cuda_GJE_radky_kernel(int N, unsigned int modul, int ipivot, uns
 	__syncthreads();
 // \ENDFOR
 // \FOR{$y$ := $1$ do $N$}
-		// TODO: prehodit cykly pres Y a X mezi sebou, vlakno nebude prochazet radek, ale sloupec
-		int iY=tid;	// prochazi pres Y, kazde vlakno samostatny radek
-		while(iY<N)
+	int iY;
+	// TODO: prehodit cykly pres Y a X mezi sebou, vlakno nebude prochazet radek, ale sloupec
+	if( zpusob & ZPUSOB_GLOB_PRISTUP )
+	{
+		iX=tid;
+	}else
+	{
+		iY=tid;
+	}
+	while( ((zpusob & ZPUSOB_GLOB_PRISTUP) && (iX<bN)) || ((!(zpusob & ZPUSOB_GLOB_PRISTUP)) && (iY<N) ) )
+	{
+	// \FOR{$x$ := $p+1$ do $N$}
+		if( zpusob & ZPUSOB_GLOB_PRISTUP )
+		{
+			iY=0;
+		}else
+		{
+			iX=0;
+		}
+		while( ((zpusob & ZPUSOB_GLOB_PRISTUP) && (iY<N)) || ((!(zpusob & ZPUSOB_GLOB_PRISTUP) && (iX<bN)) ) )
 		{
 			unsigned int a_py = m_matice[cuda_get_index(ipivot, iY, N)];
-		// \FOR{$x$ := $p+1$ do $N$}
-			for(int iX=0;iX<bN;iX++)
+			int gX=iX+bid*bN;
+			if( gX>ipivot && gX<=N )
 			{
-				int gX=iX+bid*bN;
-				if( gX>ipivot && gX<=N )
+			// \IF{$y$ == $q$}
+				if(iY == q)	// ma na starosti pivotni radek => pouze uklada do globalni
 				{
-				// \IF{$y$ == $q$}
-					if(iY == q)	// ma na starosti pivotni radek => pouze uklada do globalni
-					{
-					// \STATE ulozit do globalni pameti prvek $[x;y]=[x;q]$
+				// \STATE ulozit do globalni pameti prvek $[x;y]=[x;q]$
 #if defined(SHARED_SIZE) && SHARED_SIZE>0
-						if(gX==N)
-						{
-							m_prava_strana[iY] = sh_mem[iX];
-						}else
-						{
-							m_matice[cuda_get_index(gX, iY, N)] = sh_mem[iX];
-						}
-#endif
-				// \ELSE
+					if(gX==N)
+					{
+						m_prava_strana[iY] = sh_mem[iX];
 					}else
 					{
-					// \STATE upravit prvek $[x;y]$ stejne jako pri nulovani prvku $[p;y]$
-						unsigned int a_xy;
-						if(gX==N)
-						{
-							a_xy = m_prava_strana[iY];
-						}else
-						{
-							a_xy = m_matice[cuda_get_index(gX, iY, N)];
-						}
-						unsigned int a_xp;
-#if defined(SHARED_SIZE) && SHARED_SIZE>0
-						a_xp = sh_mem[iX];
-#else
-						if(gX==N)
-						{
-							a_xp=m_prava_strana[q];
-						}else
-						{
-							a_xp=m_matice[cuda_get_index(gX, q, N)];
-						}
+						m_matice[cuda_get_index(gX, iY, N)] = sh_mem[iX];
+					}
 #endif
-						//cout << "  " << a_xy << " * " << a_pp << " - " << a_xp << " * " << a_py << endl;
-						
+			// \ELSE
+				}else
+				{
+				// \STATE upravit prvek $[x;y]$ stejne jako pri nulovani prvku $[p;y]$
+					unsigned int a_xy;
+					if(gX==N)
+					{
+						a_xy = m_prava_strana[iY];
+					}else
+					{
+						a_xy = m_matice[cuda_get_index(gX, iY, N)];
+					}
+					unsigned int a_xp;
+#if defined(SHARED_SIZE) && SHARED_SIZE>0
+					a_xp = sh_mem[iX];
+#else
+					if(gX==N)
+					{
+						a_xp=m_prava_strana[q];
+					}else
+					{
+						a_xp=m_matice[cuda_get_index(gX, q, N)];
+					}
+#endif
+					//cout << "  " << a_xy << " * " << a_pp << " - " << a_xp << " * " << a_py << endl;
+					if(zpusob & ZPUSOB_CUDA_UPRAVA)
+					{
+						a_xy = cuda_elem_uprava_s_delenim1(modul, a_xy, a_xp, a_py);
+					}else
+					{
 						a_xy = cuda_elem_uprava_s_delenim(modul, a_xy, a_xp, a_py);
+					}
 						
-						if(gX==N)
-						{
-							m_prava_strana[iY] = a_xy;
-						}else
-						{
-							m_matice[cuda_get_index(gX, iY, N)] = a_xy;
-						}
+					if(gX==N)
+					{
+						m_prava_strana[iY] = a_xy;
+					}else
+					{
+						m_matice[cuda_get_index(gX, iY, N)] = a_xy;
 					}
 				}
-			// \ENDIF
-		// \ENDFOR
 			}
+			if( zpusob & ZPUSOB_GLOB_PRISTUP )
+			{
+				iY++;
+			}else
+			{
+				iX++;
+			}
+		// \ENDIF
+	// \ENDFOR
+		}
+		if( zpusob & ZPUSOB_GLOB_PRISTUP )
+		{
+			iX+=bdim;
+		}else
+		{
 			iY+=bdim;
 		}
+	}
 // \ENDFOR
 }
 	
@@ -950,7 +989,6 @@ void cuda_GJE_radky(int N, unsigned int modul, unsigned int* m_matice, unsigned 
 	if(num_of_gpu<=0) return;
 	int T=(gpu_property.sharedMemPerBlock / sizeof(unsigned int));
 	unsigned int *g_matice, *g_prava_strana;
-	cudaDeviceReset();
 	cudaProfilerStart();
 	cudaMalloc((void**)&g_matice, (N*N)*sizeof(unsigned int));
 	cudaMalloc((void**)&g_prava_strana, N*sizeof(unsigned int));
@@ -1271,7 +1309,7 @@ void test_GJE_radky(int N, unsigned int zpusob)
 	if(num_of_gpu<=0) return;
 	unsigned int modul = 0x40000003;
 	int ipivot=N;
-	switch(zpusob)
+	switch(zpusob & 0xFF)
 	{
 	case 9:
 		ipivot = 0;
@@ -1314,7 +1352,7 @@ void test_GJE_radky(int N, unsigned int zpusob)
 	// N+1 vlaken = N radku + 1 vlakno na pocitani inverze
 	int num_of_threads = min( gpu_property.warpSize*((int)ceil((float)(N+1)/((float)gpu_property.warpSize))), gpu_property.maxThreadsPerBlock );
 	set_pocty(num_of_blocks, num_of_threads);
-	switch(zpusob)
+	switch(zpusob & 0xFF)
 	{
 	case 8:
 		find_inverse<<<1,1>>>(N, modul, 0, g_matice, g_pivot, g_inverse);

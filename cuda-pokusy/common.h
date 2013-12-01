@@ -12,6 +12,10 @@
 #define ZPUSOB_CPU			0x0010	// 4.bit \tGPU(0) CPU(1)
 #define ZPUSOB_GLOBAL_MEM	0x0020	// 5.bit \tmatice v sdilene(0), globalni(1) pameti
 #define ZPUSOB_RADKY		0x0040	// 6.bit \tmetoda: podmatice(0), radky(1)
+// zpusoby zpracovani pro Radkovou metodu
+#define ZPUSOB_GLOB_PRISTUP	0x0100	// pristup vlaken z bloku do globalni pameti, vlakno zpracovava radek(0) nebo sloupec(1)
+#define ZPUSOB_CUDA_UPRAVA	0x0200	// deleni bude v integer(0) nebo pomoci CUDA fci(1)
+
 #define PODMATICE_12		0x8000	// 15.bit rezervovan na rozliseni podmatice12 a 34
 
 #ifndef min
