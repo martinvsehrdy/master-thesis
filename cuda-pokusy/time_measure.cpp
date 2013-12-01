@@ -9,6 +9,20 @@ clock_t start_time;
 clock_t stop_time;
 cudaEvent_t cuda_start,cuda_stop;
 
+int poc_vlaken;
+int poc_bloku;
+
+void set_pocty(int b, int t)
+{
+	poc_vlaken=t;
+	poc_bloku=b;
+}
+void get_pocty(int* b, int* t)
+{
+	*t = poc_vlaken;
+	*b = poc_bloku;
+}
+
 
 clock_t get_milisec_from_startup(void)
 {
@@ -39,7 +53,7 @@ void stop_measuring()
 // CUDA
 float cuda_get_measured_time()
 {
-	float elapsedTime;
+	float elapsedTime = -1.0;
 	cudaEventElapsedTime(&elapsedTime,cuda_start,cuda_stop);
 	return elapsedTime;
 }

@@ -934,6 +934,7 @@ int get_index(int X, int Y, int N)	// SLOUPEC, RADEK
 	return Y*N+X;
 }
 
+#define SHARED_SIZE	10
 void GJE_radky_kernel(int N, unsigned int modul, int ipivot, unsigned int* m_matice, unsigned int* m_prava_strana, 
 						int* pivot_radek, unsigned int* inverse, unsigned int zpusob)
 {
@@ -941,47 +942,66 @@ void GJE_radky_kernel(int N, unsigned int modul, int ipivot, unsigned int* m_mat
 	int bdim=1;
 	int bid=1;
 	int gdim=2;
-		fstream fout;
-		fout.open("log", fstream::out);
-	for(bid=1;0<=bid;bid--)
-	{
-		int bN=(int)ceil((double)(N+1)/gdim);
-		// TODO: velikost sh_mem udelat konstantni - zmerit rychlost vypoctu v zavislosti na teto velikosti
-		unsigned int sh_mem[10];	// size_sh_mem = N
-		//__shared__ int sh_q;	// CUDA: 'q' sdilene, pak si musi kazde vlakno vzit svou kopii
-		//__shared__ unsigned int sh_a_pq_inv;
+	int bN;
+#if defined(SHARED_SIZE) && SHARED_SIZE>0
+	bN=SHARED_SIZE;
+#else
+	bN=(int)ceil((double)(N+1)/gdim);
+#endif
+	fstream fout;
+	fout.open("log", fstream::out);
+	// TODO: velikost sh_mem udelat konstantni - zmerit rychlost vypoctu v zavislosti na teto velikosti
+#if defined(SHARED_SIZE) && SHARED_SIZE>0
+	unsigned int sh_mem[SHARED_SIZE];	// size_sh_mem = N
+#endif
+	//__shared__ int sh_q;	// CUDA: 'q' sdilene, pak si musi kazde vlakno vzit svou kopii
+	//__shared__ unsigned int sh_a_pq_inv;
 	
-	// \STATE \COMMENT{priprava pivotniho radku}
-	// \STATE nacist prvek $[p;q]$ do sdilene pameti
-		/*if( tid==0 )
-		{
-			sh_q = pivot_radek[0];
-			sh_a_pq_inv = inverse[0];
-		}
-		__syncthreads();*/
-		int q = pivot_radek[0];
-		unsigned int a_pq_inv=inverse[0];
+// \STATE \COMMENT{priprava pivotniho radku}
+// \STATE nacist prvek $[p;q]$ do sdilene pameti
+	/*if( tid==0 )
+	{
+		sh_q = pivot_radek[0];
+		sh_a_pq_inv = inverse[0];
+	}*/
+	//__syncthreads();
+	int q = pivot_radek[0];
+	unsigned int a_pq_inv=inverse[0];
 
-	// \FOR{$x$ := $p+1$ do $N$}
-		int iX=tid;
-		while(iX<bN)
+// \FOR{$x$ := $p+1$ do $N$}
+	int iX=tid;
+	while(iX<bN)
+	{
+		int gX=iX+bid*bN;
+		if( gX>=ipivot && gX<=N )
 		{
-			int gX=iX+bid*bN;
-			if( gX>=ipivot && gX<=N )
+		// \STATE nacist, vydelit a ulozit do sdilene pameti
+			unsigned long long a;
+			if(gX==N)
 			{
-			// \STATE nacist, vydelit a ulozit do sdilene pameti
-				unsigned long long a;
-				if(gX==N) a = m_prava_strana[q];
-				else a = m_matice[get_index(gX, q, N)];
-				a *= a_pq_inv;
-				a %= modul;
-				sh_mem[iX] = (unsigned int)a;
+				a = m_prava_strana[q];
+			}else
+			{
+				a = m_matice[get_index(gX, q, N)];
 			}
-			iX+=bdim;
+			a *= a_pq_inv; a %= modul;
+#if defined(SHARED_SIZE) && SHARED_SIZE>0
+			sh_mem[iX] = (unsigned int)a;
+#else
+			if(gX==N)
+			{
+				m_prava_strana[q] = (unsigned int)a;
+			}else
+			{
+				m_matice[get_index(gX, q, N)] = (unsigned int)a;
+			}
+#endif
 		}
-		//__syncthreads();
-	// \ENDFOR
-	// \FOR{$y$ := $1$ do $N$}
+		iX+=bdim;
+	}
+	//__syncthreads();
+// \ENDFOR
+// \FOR{$y$ := $1$ do $N$}
 		int iY=tid;	// prochazi pres Y, kazde vlakno samostatny radek
 		while(iY<N)
 		{
@@ -997,6 +1017,7 @@ void GJE_radky_kernel(int N, unsigned int modul, int ipivot, unsigned int* m_mat
 					if(iY == q)	// ma na starosti pivotni radek => pouze uklada do globalni
 					{
 					// \STATE ulozit do globalni pameti prvek $[x;y]=[x;q]$
+#if defined(SHARED_SIZE) && SHARED_SIZE>0
 						if(gX==N)
 						{
 							m_prava_strana[iY] = sh_mem[iX];
@@ -1006,6 +1027,7 @@ void GJE_radky_kernel(int N, unsigned int modul, int ipivot, unsigned int* m_mat
 							m_matice[get_index(gX, iY, N)] = sh_mem[iX];
 							fout << "m_matice[get_index("<< gX << ", " << iY << ", " << N << ")] = sh_mem[" << iX << "];" << endl;
 						}
+#endif
 				// \ELSE
 					}else
 					{
@@ -1020,8 +1042,19 @@ void GJE_radky_kernel(int N, unsigned int modul, int ipivot, unsigned int* m_mat
 							a_xy = m_matice[get_index(gX, iY, N)];
 							fout << "a_xy = m_matice[get_index(" << gX << ", " << iY << ", " << N << ")];" << endl;
 						}
-						unsigned int a_xp = sh_mem[iX];
+						unsigned int a_xp;
+#if defined(SHARED_SIZE) && SHARED_SIZE>0
+						a_xp = sh_mem[iX];
 						fout << "unsigned int a_xp = sh_mem[" << iX << "];" << endl;
+#else
+						if(gX==N)
+						{
+							a_xp=m_prava_strana[q];
+						}else
+						{
+							a_xp=m_matice[get_index(gX, q, N)];
+						}
+#endif
 						//cout << "  " << a_xy << " * " << a_pp << " - " << a_xp << " * " << a_py << endl;
 						
 						a_xy = elem_uprava_s_delenim(modul, a_xy, a_xp, a_py);
@@ -1042,8 +1075,6 @@ void GJE_radky_kernel(int N, unsigned int modul, int ipivot, unsigned int* m_mat
 			}
 			iY+=bdim;
 		}
-	// \ENDFOR
-		vypsat_mat(N, N, m_matice, m_prava_strana);
-	}
-	fout.close();
+// \ENDFOR
+		fout.close();
 }

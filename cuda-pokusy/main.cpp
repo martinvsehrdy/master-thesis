@@ -68,15 +68,35 @@ int main(int argc, char** argv)
 // argv[0] <N> <modul>
 {
 	stringstream ss;
-	int N=100;
+	int N=1000;
 	unsigned int modul=0x10000003; //(~(unsigned int)0);
 	modul = 0x40000003;	// nejmensi prvocislo v [2^30+1;2^31-1]
 	modul = 0x7FFFFFED;	// nejvetsi prvocislo v [2^30+1;2^31-1]
-	unsigned int zpusob=0;
+	unsigned int zpusob=9;
+	
+	/*modul = 4099;
+	unsigned int* M=new unsigned int[N*N];
+	unsigned int* Pfor=new unsigned int[N];
+	unsigned int* P=new unsigned int[N];
+	hilbert_matrix(N, M, Pfor);
+	gauss_jordan_elim_for(N, modul, M, Pfor, ZPUSOB_S_DELENIM);
+
+	hilbert_matrix(N, M, P);
+	int pivot_radek = 0;
+	unsigned int inverse = 10;
+
+	GJE_radky_kernel(N, modul, 0, M, P, &pivot_radek, &inverse, zpusob);
+	delete M;
+	delete P;
+	return 0;
+	//*/
+
 	if(argc>2)
 	{
+#ifndef _DEBUG
 		N=atoi(argv[1]);
 		zpusob=atoi(argv[2]);
+#endif
 	}else
 	{
 		cout << "#Program spustte ve tvaru:" << argv[0] << " <N> <zpusob zpracovani>" << endl;
@@ -93,11 +113,21 @@ int main(int argc, char** argv)
 
 	cout << N << "\t";
 	modul = 0x40000003;
-	
+	float tt=0;
+	int pocet=0;
+//	do{
 	test_GJE_radky(N, zpusob);
 	
-	float tt=cuda_get_measured_time();
-	cout << tt << endl;
+		tt+=cuda_get_measured_time();
+		pocet++;
+
+//	}while(tt<100.0 && pocet<1000);
+	int poc_vlaken;
+	int poc_bloku;
+	get_pocty(&poc_bloku, &poc_vlaken);
+	cout << (tt/pocet) << "\t" << tt << " / " << pocet << "\t";
+	cout << poc_bloku << "\t" << poc_vlaken << "\t";
+	cout << endl;
 	
 	
 #ifdef _DEBUG

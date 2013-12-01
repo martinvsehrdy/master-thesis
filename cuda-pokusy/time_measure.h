@@ -11,6 +11,8 @@ float cuda_get_measured_time();
 void cuda_start_measuring();
 void cuda_stop_measuring();
 
+void set_pocty(int b, int t);
+void get_pocty(int* b, int* t);
 
 
 #endif	/* _TIME_MEASURE_H_ */
