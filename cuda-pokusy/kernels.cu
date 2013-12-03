@@ -835,8 +835,8 @@ __global__ void cuda_GJE_radky_kernel(int N, unsigned int modul, int ipivot, uns
 // \STATE nacist prvek $[p;q]$ do sdilene pameti
 	if( tid==0 )
 	{
-		sh_q = pivot_radek[0] % N;
-		sh_a_pq_inv = inverse[0] % modul;
+		sh_q = pivot_radek[0];
+		sh_a_pq_inv = inverse[0];
 	}
 	__syncthreads();
 	int q = sh_q;
@@ -884,101 +884,81 @@ __global__ void cuda_GJE_radky_kernel(int N, unsigned int modul, int ipivot, uns
 // \ENDFOR
 // \FOR{$y$ := $1$ do $N$}
 	int iY;
-	// TODO: prehodit cykly pres Y a X mezi sebou, vlakno nebude prochazet radek, ale sloupec
-	if( zpusob & ZPUSOB_GLOB_PRISTUP )
+	iX=tid;
+	
+	while(iX<bN)
 	{
-		iX=tid;
-	}else
-	{
-		iY=tid;
-	}
-	while( ((zpusob & ZPUSOB_GLOB_PRISTUP) && (iX<bN)) || ((!(zpusob & ZPUSOB_GLOB_PRISTUP)) && (iY<N) ) )
-	{
-	// \FOR{$x$ := $p+1$ do $N$}
-		if( zpusob & ZPUSOB_GLOB_PRISTUP )
+		unsigned int a_xp;
+#if defined(SHARED_SIZE) && SHARED_SIZE>0
+		a_xp = sh_mem[iX];
+#else
+		if(gX==N)
 		{
-			iY=0;
+			a_xp=m_prava_strana[q];
 		}else
 		{
-			iX=0;
+			a_xp=m_matice[cuda_get_index(gX, q, N)];
 		}
-		while( ((zpusob & ZPUSOB_GLOB_PRISTUP) && (iY<N)) || ((!(zpusob & ZPUSOB_GLOB_PRISTUP) && (iX<bN)) ) )
+#endif
+		if(a_xp!=0)
 		{
-			unsigned int a_py = m_matice[cuda_get_index(ipivot, iY, N)];
-			int gX=iX+bid*bN;
-			if( gX>ipivot && gX<=N )
+		// \FOR{$x$ := $p+1$ do $N$}
+			iY=0;
+			while(iY<N)
 			{
-			// \IF{$y$ == $q$}
-				if(iY == q)	// ma na starosti pivotni radek => pouze uklada do globalni
+				unsigned int a_py = m_matice[cuda_get_index(ipivot, iY, N)];
+				int gX=iX+bid*bN;
+				if( gX>ipivot && gX<=N )
 				{
-				// \STATE ulozit do globalni pameti prvek $[x;y]=[x;q]$
+				// \IF{$y$ == $q$}
+					if(iY == q)	// ma na starosti pivotni radek => pouze uklada do globalni
+					{
+					// \STATE ulozit do globalni pameti prvek $[x;y]=[x;q]$
 #if defined(SHARED_SIZE) && SHARED_SIZE>0
-					if(gX==N)
-					{
-						m_prava_strana[iY] = sh_mem[iX];
-					}else
-					{
-						m_matice[cuda_get_index(gX, iY, N)] = sh_mem[iX];
-					}
+						if(gX==N)
+						{
+							m_prava_strana[iY] = sh_mem[iX];
+						}else
+						{
+							m_matice[cuda_get_index(gX, iY, N)] = sh_mem[iX];
+						}
 #endif
-			// \ELSE
-				}else
-				{
-				// \STATE upravit prvek $[x;y]$ stejne jako pri nulovani prvku $[p;y]$
-					unsigned int a_xy;
-					if(gX==N)
-					{
-						a_xy = m_prava_strana[iY];
+				// \ELSE
 					}else
 					{
-						a_xy = m_matice[cuda_get_index(gX, iY, N)];
-					}
-					unsigned int a_xp;
-#if defined(SHARED_SIZE) && SHARED_SIZE>0
-					a_xp = sh_mem[iX];
-#else
-					if(gX==N)
-					{
-						a_xp=m_prava_strana[q];
-					}else
-					{
-						a_xp=m_matice[cuda_get_index(gX, q, N)];
-					}
-#endif
-					//cout << "  " << a_xy << " * " << a_pp << " - " << a_xp << " * " << a_py << endl;
-					if(zpusob & ZPUSOB_CUDA_UPRAVA)
-					{
-						a_xy = cuda_elem_uprava_s_delenim1(modul, a_xy, a_xp, a_py);
-					}else
-					{
-						a_xy = cuda_elem_uprava_s_delenim(modul, a_xy, a_xp, a_py);
-					}
+					// \STATE upravit prvek $[x;y]$ stejne jako pri nulovani prvku $[p;y]$
+						unsigned int a_xy;
+						if(gX==N)
+						{
+							a_xy = m_prava_strana[iY];
+						}else
+						{
+							a_xy = m_matice[cuda_get_index(gX, iY, N)];
+						}
+
+						//cout << "  " << a_xy << " * " << a_pp << " - " << a_xp << " * " << a_py << endl;
+						if(zpusob & ZPUSOB_CUDA_UPRAVA)
+						{
+							a_xy = cuda_elem_uprava_s_delenim1(modul, a_xy, a_xp, a_py);
+						}else
+						{
+							a_xy = cuda_elem_uprava_s_delenim(modul, a_xy, a_xp, a_py);
+						}
 						
-					if(gX==N)
-					{
-						m_prava_strana[iY] = a_xy;
-					}else
-					{
-						m_matice[cuda_get_index(gX, iY, N)] = a_xy;
+						if(gX==N)
+						{
+							m_prava_strana[iY] = a_xy;
+						}else
+						{
+							m_matice[cuda_get_index(gX, iY, N)] = a_xy;
+						}
 					}
 				}
-			}
-			if( zpusob & ZPUSOB_GLOB_PRISTUP )
-			{
 				iY++;
-			}else
-			{
-				iX++;
+			// \ENDIF
+		// \ENDFOR
 			}
-		// \ENDIF
-	// \ENDFOR
-		}
-		if( zpusob & ZPUSOB_GLOB_PRISTUP )
-		{
 			iX+=bdim;
-		}else
-		{
-			iY+=bdim;
 		}
 	}
 // \ENDFOR
