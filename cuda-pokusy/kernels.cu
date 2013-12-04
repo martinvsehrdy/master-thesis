@@ -847,13 +847,8 @@ __global__ void cuda_GJE_radky_kernel(int N, unsigned int modul, int ipivot, uns
 			a_xp = m_matice[cuda_get_index(gX, q, N)];
 		}
 
-		if(zpusob & ZPUSOB_CUDA_UPRAVA)
-		{
-			a_xp = cuda_multiply_add_modulo1(modul, a_xp, a_pq_inv, 0);
-		}else
-		{
-			a_xp = cuda_multiply_add_modulo(modul, a_xp, a_pq_inv, 0);
-		}
+		a_xp = cuda_multiply_add_modulo1(modul, a_xp, a_pq_inv, 0);
+		
 		if(gX==N)
 		{
 			m_prava_strana[q] = a_xp;
@@ -885,13 +880,7 @@ __global__ void cuda_GJE_radky_kernel(int N, unsigned int modul, int ipivot, uns
 					}
 
 					//cout << "  " << a_xy << " * " << a_pp << " - " << a_xp << " * " << a_py << endl;
-					if(zpusob & ZPUSOB_CUDA_UPRAVA)
-					{
-						a_xy = cuda_elem_uprava_s_delenim1(modul, a_xy, a_xp, a_py);
-					}else
-					{
-						a_xy = cuda_elem_uprava_s_delenim(modul, a_xy, a_xp, a_py);
-					}
+					a_xy = cuda_elem_uprava_s_delenim1(modul, a_xy, a_xp, a_py);
 						
 					if(gX==N)
 					{
@@ -974,7 +963,7 @@ void cuda_GJE_radky(int N, unsigned int modul, unsigned int* m_matice, unsigned 
 	cudaMemcpy(m_prava_strana, g_prava_strana, N*sizeof(unsigned int), cudaMemcpyDeviceToHost);
 	cudaFree(g_matice);
 	cudaFree(g_prava_strana);
-
+	//cudaDeviceReset();
 	//cudaProfilerStop();
 }
 
@@ -1180,46 +1169,44 @@ __global__ void test_elem_uprava_kernel_s2(int n, unsigned int modul)
 void test_elem_uprava(int N, unsigned int modul, unsigned int zpusob)
 {
 	if(num_of_gpu<=0) return;
-	cudaProfilerStart();
 
 	cuda_start_measuring();
 	// vypocet
 	if( (zpusob & ZPUSOB_S_DELENIM) )
 	{
-		test_elem_uprava_kernel_s<<<1,1>>>(N, modul);
+		// a1=cuda_elem_uprava_s_delenim(modul, a1, a2, 1269239);
+		test_elem_uprava_kernel_s<<<gpu_property.multiProcessorCount,gpu_property.maxThreadsPerBlock>>>(N, modul);
 	}else
 	{
 		test_elem_uprava_kernel_bez<<<1,1>>>(N, modul);
 	}
 	cudaThreadSynchronize();
 	cuda_stop_measuring();
-	cudaProfilerStop();
 }
 
 void test_elem_uprava1(int N, unsigned int modul, unsigned int zpusob)
 {
 	if(num_of_gpu<=0) return;
-	cudaProfilerStart();
 
 	cuda_start_measuring();
 	// vypocet
 	if( (zpusob & ZPUSOB_S_DELENIM) )
 	{
-		test_elem_uprava_kernel_s1<<<1,1>>>(N, modul);
+		// a1=cuda_elem_uprava_s_delenim1(modul, a1, a2, 1269239);
+		test_elem_uprava_kernel_s1<<<gpu_property.multiProcessorCount,gpu_property.maxThreadsPerBlock>>>(N, modul);
 	}else
 	{
 		test_elem_uprava_kernel_bez1<<<1,1>>>(N, modul);
 	}
 	cudaThreadSynchronize();
 	cuda_stop_measuring();
-	cudaProfilerStop();
+
 }
 
 void test_elem_uprava2(int N, unsigned int modul, unsigned int zpusob)
 {
 	if(num_of_gpu<=0) return;
-	cudaProfilerStart();
-
+	
 	cuda_start_measuring();
 	// vypocet
 	if( (zpusob & ZPUSOB_S_DELENIM) )
@@ -1231,7 +1218,6 @@ void test_elem_uprava2(int N, unsigned int modul, unsigned int zpusob)
 	}
 	cudaThreadSynchronize();
 	cuda_stop_measuring();
-	cudaProfilerStop();
 }
 void test_GJE_radky(int N, unsigned int zpusob)
 {
