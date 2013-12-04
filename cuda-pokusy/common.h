@@ -15,6 +15,7 @@
 // zpusoby zpracovani pro Radkovou metodu
 #define ZPUSOB_GLOB_PRISTUP	0x0100	// pristup vlaken z bloku do globalni pameti, vlakno zpracovava radek(0) nebo sloupec(1)
 #define ZPUSOB_CUDA_UPRAVA	0x0200	// deleni bude v integer(0) nebo pomoci CUDA fci(1)
+#define ZPUSOB_HILBERT_MAT	0x0400	// Hilbertova matice, jinak bude tridiagonalni
 
 #define PODMATICE_12		0x8000	// 15.bit rezervovan na rozliseni podmatice12 a 34
 

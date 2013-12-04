@@ -83,7 +83,13 @@ void main1(int argc, char** argv, int N, unsigned int settings)
 	unsigned int* P=new unsigned int[N];
 	unsigned int* Pfor=new unsigned int[N];
 
-	hilbert_matrix(N, M, Pfor);
+	if(settings & ZPUSOB_HILBERT_MAT)
+	{
+		hilbert_matrix<unsigned int>(N, M, Pfor);
+	}else
+	{
+		tridiag_matrix<unsigned int>(N, M, Pfor);
+	}
 	gauss_jordan_elim_for(N, modul, M, Pfor, settings | ZPUSOB_S_DELENIM);
 	ss.str("");
 	ss.clear();
@@ -91,7 +97,13 @@ void main1(int argc, char** argv, int N, unsigned int settings)
 	//ss << N;
 	save_vys<unsigned int>(N, Pfor, (char*)ss.str().c_str());
 
-	hilbert_matrix(N, M, P);
+	if(settings & ZPUSOB_HILBERT_MAT)
+	{
+		hilbert_matrix<unsigned int>(N, M, P);
+	}else
+	{
+		tridiag_matrix<unsigned int>(N, M, P);
+	}
 	vypsat_mat(N, N, M, P);
 	init_gpu_compute();
 	cuda_GJE_radky(N, modul, M, P, settings);
@@ -171,7 +183,7 @@ void main2(int argc, char** argv)
 	}
 	init_gpu_compute();
 
-	cout << N << "\t" << (zpusob & 0xFF) << "\t" << SHARED_SIZE << "\t";
+	cout << N << "\t" << (zpusob & 0xFF) << "\t-\t";
 	modul = 0x40000003;
 	float tt=0;
 	int pocet=0;
@@ -200,12 +212,12 @@ int main(int argc, char** argv)
 // argv[0] <N> <modul>
 {
 	
-	main2(argc, argv);
-	//main1(argc, argv, 50, (unsigned int)9 | ZPUSOB_GLOB_PRISTUP | ZPUSOB_CUDA_UPRAVA);
+	//main2(argc, argv);
+	/*main1(argc, argv, 20, (unsigned int)9 | ZPUSOB_GLOB_PRISTUP | ZPUSOB_CUDA_UPRAVA | ZPUSOB_HILBERT_MAT);
 	
 	 /*/
 	////////////////////////////////////////////////////////
-	int N=300;
+	int N=10;
 	unsigned int modul=0x10000003; //(~(unsigned int)0);
 	int zpusob=0;
 	if(argc>2)
@@ -222,10 +234,34 @@ int main(int argc, char** argv)
 		cout << "#                   4.bit \tGPU(0) CPU(1)" << endl;
 		cout << "#                   5.bit \tmatice v sdilene(0), globalni(1) pameti" << endl;
 		cout << "#                   6.bit \tmetoda: podmatice(0), radky(1)" << endl;
-
-
-		cout << "#Vystup: <velikost N> <na GPU [ms]>\t<z GPU [ms]>\tprumer\tnejrychlejsi\t1.quartal\tmedian\t3.quartal\tnejpomalejsi\t<celkem [ms]>" << endl;
+		cout << "#    G - vlakno zpracovava sloupec matice" << endl;
+		cout << "#    D - elementarni uprava bude v realnych cislech s CUDA funkcema" << endl;
+		cout << "#    M - hilbertova matice, jinak bude tridiagonalni" << endl;
+		cout << "#Vystup: <velikost N> <na GPU [ms]>\t<z GPU [ms]>\tprumer\tnejrychlejsi\t1.quartal\tmedian\t3.quartal\tnejpomalejsi\t<celkem [ms]>\t <gdm>" << endl;
 		return 0;
+	}
+	for(int i=1;i<argc;i++)
+	{
+		if(argv[i][0]=='-')
+		{
+			int j=1;
+			while(argv[i][j]!=0)
+			{
+				switch(argv[i][j])
+				{
+				case 'g':
+				case 'G': zpusob |= ZPUSOB_GLOB_PRISTUP;
+					break;
+				case 'd':
+				case 'D': zpusob |= ZPUSOB_CUDA_UPRAVA;
+					break;
+				case 'm':
+				case 'M': zpusob |= ZPUSOB_HILBERT_MAT;
+					break;
+				}
+				j++;
+			}
+		}
 	}
 	// TODO: vypocet
 	unsigned int* A=new unsigned int[N*N];
@@ -238,7 +274,13 @@ int main(int argc, char** argv)
 	for(int opakovani=0;opakovani<POC_OPAKOVANI;opakovani++)
 	{
 #endif
-		hilbert_matrix<unsigned int>(N, A, b);
+		if(zpusob & ZPUSOB_HILBERT_MAT)
+		{
+			hilbert_matrix<unsigned int>(N, A, b);
+		}else
+		{
+			tridiag_matrix<unsigned int>(N, A, b);
+		}
 #ifdef _DEBUG
 	vypsat_mat<unsigned int>(N, N, A, b);
 #endif
@@ -274,23 +316,23 @@ int main(int argc, char** argv)
 			tt = cuda_get_measured_time();
 		}
 #ifndef _DEBUG
-		if(opakovani==0)
-		{
-			ss.str("");
-			ss.clear();
-			ss << "outmatN" << N << "Z" << argv[2];
-			save_vys(N, b, (char*)ss.str().c_str());
-		}
 		times.push_back(tt);
 		sum += tt;
-		if( !(zpusob & ZPUSOB_CPU) ) cudaDeviceReset();
+		//if( !(zpusob & ZPUSOB_CPU) ) cudaDeviceReset();
 		Sleep(100);
 	}
 	float q1, q2, q3, prumer;
 	statistic(times, &q1, &q2, &q3, &prumer);
 	times.sort();
 	//<velikost N> <na GPU [ms]>\t<z GPU [ms]>\tprumer\tnejrychlejsi\t1.quartal\tmedian\t3.quartal\tnejpomalejsi\t<celkem [ms]>
-	cout << N << "\t?\t?\t" << prumer << "\t" << times.front() << "\t" << q1 << "\t" << q2 << "\t" << q3 << "\t" << times.back() << "\t" << sum << endl;
+	cout << N << "\t?\t?\t" << prumer << "\t" << times.front() << "\t" << q1 << "\t" << q2 << "\t" << q3 << "\t" << times.back() << "\t" << sum << "\t";
+	if(zpusob & ZPUSOB_GLOB_PRISTUP) cout << "G";
+	else cout << "g";
+	if(zpusob & ZPUSOB_CUDA_UPRAVA)  cout << "D";
+	else cout << "d";
+	if(zpusob & ZPUSOB_HILBERT_MAT)  cout << "M";
+	else cout << "m";
+	cout << endl;
 #else
 	cout << tt << "ms" << endl;
 #endif

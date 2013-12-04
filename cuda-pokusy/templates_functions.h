@@ -21,6 +21,25 @@ void hilbert_matrix(int N, TYPE* matice, TYPE* prava_strana)
 	}
 }
 template<class TYPE>
+void tridiag_matrix(int N, TYPE* matice, TYPE* prava_strana)
+{
+	TYPE a;
+	for(int y=0;y<N;y++)
+	{
+		for(int x=0;x<N;x++)
+		{
+			if(x==y-1) a = (TYPE)x;
+			else if(x==y)a = (TYPE)3;
+			else if(x==y+1)	a = (TYPE)(N-x);
+			else a = (TYPE)0;
+
+			matice[get_index(x, y, N)]=a;
+		}
+		prava_strana[y]=y+1;
+	}
+}
+
+template<class TYPE>
 int load_matrix(int* N, TYPE** matice, TYPE** prava_strana, char* filename)
 {
 	TYPE* matice1=*matice;
