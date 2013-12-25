@@ -332,24 +332,20 @@ __device__ void gauss_jordan_elim_while_kernel(int Sx, int Sy, unsigned int modu
 
 		__syncthreads();
 		unsigned int a_pp;
-		if( zpusob & ZPUSOB_S_DELENIM )
+		
+		unsigned int a_pp_inv = cuda_compute_inverse_eukleides(m_matice[cuda_get_index(ipivot, ipivot, Sx)], modul);
+		// vydelit cely ipivot-ty radek cislem a_pp
+		itid=tid;
+		while(itid<Sx)
 		{
-			unsigned int a_pp_inv = cuda_compute_inverse_eukleides(m_matice[cuda_get_index(ipivot, ipivot, Sx)], modul);
-			// vydelit cely ipivot-ty radek cislem a_pp
-			itid=tid;
-			while(itid<Sx)
-			{
-				unsigned long long pom = m_matice[cuda_get_index(itid, ipivot, Sx)];
-				pom *= a_pp_inv;
-				pom %= modul;
-				m_matice[cuda_get_index(itid, ipivot, Sx)]=(unsigned int)pom;
+			unsigned long long pom = m_matice[cuda_get_index(itid, ipivot, Sx)];
+			pom *= a_pp_inv;
+			pom %= modul;
+			m_matice[cuda_get_index(itid, ipivot, Sx)]=(unsigned int)pom;
 
-				itid+=bdim;
-			}
-		}else
-		{
-			a_pp = m_matice[cuda_get_index(ipivot, ipivot, Sx)];
+			itid+=bdim;
 		}
+		
 
 		//*
 		if(zpusob & ZPUSOB_WF)
@@ -365,13 +361,9 @@ __device__ void gauss_jordan_elim_while_kernel(int Sx, int Sy, unsigned int modu
 					{
 						unsigned int a_xy = m_matice[cuda_get_index(iX, itid, Sx)];
 						unsigned int a_xp = m_matice[cuda_get_index(iX, ipivot, Sx)];
-						if( zpusob & ZPUSOB_S_DELENIM )
-						{
-							m_matice[cuda_get_index(iX, itid, Sx)] = cuda_elem_uprava_s_delenim(modul, a_xy, a_xp, a_py);
-						}else
-						{
-							m_matice[cuda_get_index(iX, itid, Sx)] = cuda_elem_uprava_bez_deleni(modul, a_xy, a_pp, a_xp, a_py);
-						}
+						
+						m_matice[cuda_get_index(iX, itid, Sx)] = cuda_elem_uprava_s_delenim1(modul, a_xy, a_xp, a_py);
+						
 					}
 				}
 				itid+=bdim;
@@ -389,13 +381,9 @@ __device__ void gauss_jordan_elim_while_kernel(int Sx, int Sy, unsigned int modu
 					{
 						unsigned int a_xy = m_matice[cuda_get_index(itid, iY, Sx)];
 						unsigned int a_xp = m_matice[cuda_get_index(itid, ipivot, Sx)];
-						if( zpusob & ZPUSOB_S_DELENIM )
-						{
-							m_matice[cuda_get_index(itid, iY, Sx)] = cuda_elem_uprava_s_delenim(modul, a_xy, a_xp, a_py);
-						}else
-						{
-							m_matice[cuda_get_index(itid, iY, Sx)] = cuda_elem_uprava_bez_deleni(modul, a_xy, a_pp, a_xp, a_py);
-						}
+
+						m_matice[cuda_get_index(itid, iY, Sx)] = cuda_elem_uprava_s_delenim1(modul, a_xy, a_xp, a_py);
+						
 						itid+=bdim;
 					}
 				}
@@ -403,18 +391,12 @@ __device__ void gauss_jordan_elim_while_kernel(int Sx, int Sy, unsigned int modu
 			}
 		}
 	}
-	if( zpusob & ZPUSOB_S_DELENIM )
+	
+	itid=tid;
+	while(itid<Smin)
 	{
-		unsigned long long pom;
-		itid=tid;
-		while(itid<Smin)
-		{
-			pom = m_matice[cuda_get_index(Sx-1, itid, Sx)];
-			pom *= cuda_compute_inverse_eukleides(m_matice[cuda_get_index(itid, itid, Sx)], modul);
-			pom %= modul;
-			m_matice[cuda_get_index(Sx-1, itid, Sx)] = (unsigned int)pom;
-			itid+=bdim;
-		}
+		m_matice[cuda_get_index(Sx-1, itid, Sx)] = cuda_multiply_add_modulo1(modul, m_matice[cuda_get_index(Sx-1, itid, Sx)], cuda_compute_inverse_eukleides(m_matice[cuda_get_index(itid, itid, Sx)], modul), 0);
+		itid+=bdim;
 	}
 }
 
@@ -463,18 +445,13 @@ __device__ void cuda_compute_podmatice24(int N, unsigned int modul, int pivot_x,
 			pom_mat=s_mat;
 			is_podm3 = false;
 			// deleni: radek sdiag na '1'
-			if( zpusob & ZPUSOB_S_DELENIM )
+			unsigned int a_pp_inv=actions2[isloupec];
+			int x=tid;
+			while(x<Sx)
 			{
-				unsigned int a_pp_inv=actions2[isloupec];
-				int x=tid;
-				while(x<Sx)
-				{
-					unsigned long long pom = s_mat[cuda_get_index(x, isloupec, Sx)];
-					pom *= a_pp_inv;
-					pom %= modul;
-					s_mat[cuda_get_index(x, isloupec, Sx)]=(unsigned int)pom;
-					x+=bdim;
-				}
+				s_mat[cuda_get_index(x, isloupec, Sx)]=cuda_multiply_add_modulo1(modul, s_mat[cuda_get_index(x, isloupec, Sx)], a_pp_inv, 0);
+				
+				x+=bdim;
 			}
 		}else
 		{
@@ -496,13 +473,8 @@ __device__ void cuda_compute_podmatice24(int N, unsigned int modul, int pivot_x,
 					unsigned int a_xy = s_mat[cuda_get_index(iX, iY, Sx)];
 					unsigned int a_xp = pom_mat[cuda_get_index(iX, isloupec, Sx)];
 					//cout << "  " << a_xy << " * " << a_pp << " - " << a_xp << " * " << a_py << endl;
-					if(zpusob & ZPUSOB_S_DELENIM)
-					{
-						s_mat[cuda_get_index(iX, iY, Sx)] = cuda_elem_uprava_s_delenim(modul, a_xy, a_xp, a_py);
-					}else
-					{
-						s_mat[cuda_get_index(iX, iY, Sx)] = cuda_elem_uprava_bez_deleni(modul, a_xy, a_pp, a_xp, a_py);
-					}
+					s_mat[cuda_get_index(iX, iY, Sx)] = cuda_elem_uprava_s_delenim1(modul, a_xy, a_xp, a_py);
+					
 				}
 			}else
 			{
@@ -544,25 +516,21 @@ __device__ void cuda_compute_podmatice13(int N, unsigned int modul, int pivot_x,
 			pom_mat=s_mat;
 			is_podm3 = false;
 			// deleni: radek sdiag na '1'
-			if( (tid==0) && (zpusob & ZPUSOB_S_DELENIM) )
+			if( (tid==0) )
 			{
 				actions2[isloupec]=cuda_compute_inverse_eukleides(s_mat[cuda_get_index(isloupec, isloupec, Sx)], modul);
 			}
 			__syncthreads();
-			if( zpusob & ZPUSOB_S_DELENIM )
+			
+			unsigned int a_pp_inv=actions2[isloupec];
+			int x=tid;
+			while(x<Sx)
 			{
-				unsigned int a_pp_inv=actions2[isloupec];
-				int x=tid;
-				while(x<Sx)
-				{
-					unsigned long long pom = s_mat[cuda_get_index(x, isloupec, Sx)];
-					pom *= a_pp_inv;
-					pom %= modul;
-					s_mat[cuda_get_index(x, isloupec, Sx)]=(unsigned int)pom;
-					x+=bdim;
-				}
+				s_mat[cuda_get_index(x, isloupec, Sx)]=cuda_multiply_add_modulo1(modul, s_mat[cuda_get_index(x, isloupec, Sx)], a_pp_inv, 0);
 				
+				x+=bdim;
 			}
+			
 		}else	// 'isloupec'-ty sloupec v podmatici je pod nebo nad diagonalnim prvkem
 		{
 			// podmatice3
@@ -573,16 +541,10 @@ __device__ void cuda_compute_podmatice13(int N, unsigned int modul, int pivot_x,
 
 		//vypsat_mat<unsigned int>(Sx, Sy, s_mat, NULL);
 		// -------------------
-		if( tid==0 && !(zpusob & ZPUSOB_S_DELENIM) )
-		{
-			actions2[isloupec] = pom_mat[cuda_get_index(isloupec, isloupec, Sx)];
-		}
+		actions2[isloupec] = pom_mat[cuda_get_index(isloupec, isloupec, Sx)];
+		
 		unsigned int a_pp=1;
-		if( !(zpusob & ZPUSOB_S_DELENIM) )
-		{
-			__syncthreads();
-			a_pp=actions2[isloupec];
-		}
+		
 		__syncthreads();
 		int iY=tid;
 		while(iY<Sy)
@@ -603,13 +565,8 @@ __device__ void cuda_compute_podmatice13(int N, unsigned int modul, int pivot_x,
 						//cout << "  " << a_xy << " * " << a_pp << " - " << a_xp << " * " << a_py << endl;
 						if(a_xp!=0)
 						{
-							if(zpusob & ZPUSOB_S_DELENIM)
-							{
-								s_mat[cuda_get_index(iX, iY, Sx)] = cuda_elem_uprava_s_delenim(modul, a_xy, a_xp, a_py);
-							}else
-							{
-								s_mat[cuda_get_index(iX, iY, Sx)] = cuda_elem_uprava_bez_deleni(modul, a_xy, a_pp, a_xp, a_py);
-							}
+							s_mat[cuda_get_index(iX, iY, Sx)] = cuda_elem_uprava_s_delenim1(modul, a_xy, a_xp, a_py);
+							
 						}
 					}
 				}
@@ -633,8 +590,6 @@ __global__ void cuda_GJE_podmatice_kernel(int N, int Sx, int Sy, unsigned int mo
 	int Smin=min(Sx, Sy);
 	unsigned int* s_matice=&(shared_memory[0]);	// velikost Sx*Sy+Sx*Smin = Sx*(Sy+Smin)
 	unsigned int* actions=&(shared_memory[Sx*(Sy+Smin)]);	// velikost Smin*Sy+2*Smin
-	unsigned int mask_copy = 0x0000;
-	if( !(zpusob & ZPUSOB_S_DELENIM) ) mask_copy |= COPY_MAT_BEZ_DELENI;
 	unsigned int* p_matice=&(s_matice[Sx*Sy]);
 	
 // \FOR{$p$ := $1$ do $\lceil\frac{N}{\min(S_x, S_y)}\rceil$}
@@ -745,6 +700,7 @@ void cuda_GJE_podmatice(int N, unsigned int modul, unsigned int* m_matice, unsig
 	cudaMemcpy(g_prava_strana, m_prava_strana, N*sizeof(unsigned int), cudaMemcpyHostToDevice);
 	cuda_start_measuring();
 	int num_of_threads;
+	int num_of_blocks=1;
 	switch( ((zpusob & ZPUSOB_VLAKNA) >> 2) )
 	{
 	case 0:
@@ -769,7 +725,11 @@ void cuda_GJE_podmatice(int N, unsigned int modul, unsigned int* m_matice, unsig
 	{
 		int Sx;
 		int Sy;
-		float fSx=sqrt( (float)((N+1)*(N+1)+T) ) - (N+1);
+		Sx = (int)floor((sqrt(1+3*(float)T)-1)/3);
+		Sy = Sx;
+		Sx = (int)floor((sqrt(1+5*(float)T)-1)/5);
+		Sy = 2*Sx;
+		/*float fSx=sqrt( (float)((N+1)*(N+1)+T) ) - (N+1);
 		if( fSx < 1)
 		{
 			Sx=1;
@@ -778,12 +738,14 @@ void cuda_GJE_podmatice(int N, unsigned int modul, unsigned int* m_matice, unsig
 		{
 		Sx=(int)floor(fSx);
 			Sy=N;
-		}
+		}*/
+		
 		int Smin=min(Sx,Sy);
 		int size_of_shared= Sx*Sy+Sx*Smin +	// size_s_matice
 							Smin*Sy+2*Smin;	// size_actions
 		// 
-		cuda_GJE_podmatice_kernel<<<1,num_of_threads,size_of_shared*sizeof(unsigned int)>>>(N, Sx, Sy, modul, g_matice, g_prava_strana, zpusob);
+		set_pocty(num_of_blocks,num_of_threads, Sx, Sy);
+		cuda_GJE_podmatice_kernel<<<num_of_blocks,num_of_threads,size_of_shared*sizeof(unsigned int)>>>(N, Sx, Sy, modul, g_matice, g_prava_strana, zpusob);
 	}
 	cudaThreadSynchronize();
 	cuda_stop_measuring();
@@ -1266,7 +1228,7 @@ void test_GJE_radky(int N, unsigned int zpusob)
 #endif
 	// N+1 vlaken = N radku + 1 vlakno na pocitani inverze
 	int num_of_threads = min( gpu_property.warpSize*((int)ceil((float)(N+1)/((float)gpu_property.warpSize))), gpu_property.maxThreadsPerBlock );
-	set_pocty(num_of_blocks, num_of_threads);
+	set_pocty(num_of_blocks, num_of_threads, 0, 0);
 	switch(zpusob & 0xFF)
 	{
 	case 8:

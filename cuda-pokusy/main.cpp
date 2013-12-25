@@ -193,7 +193,7 @@ void main2(int argc, char** argv)
 
 	int poc_vlaken;
 	int poc_bloku;
-	get_pocty(&poc_bloku, &poc_vlaken);
+	get_pocty(&poc_bloku, &poc_vlaken, NULL, NULL);
 	cout << tt << "\t";
 	cout << poc_bloku << "\t" << poc_vlaken << "\t";
 	if(zpusob & ZPUSOB_GLOB_PRISTUP) cout << "G";
@@ -237,7 +237,7 @@ int main(int argc, char** argv)
 		cout << "#    G - vlakno zpracovava sloupec matice" << endl;
 		cout << "#    D - elementarni uprava bude v realnych cislech s CUDA funkcema" << endl;
 		cout << "#    M - hilbertova matice, jinak bude tridiagonalni" << endl;
-		cout << "#Vystup: <velikost N> <na GPU [ms]>\t<z GPU [ms]>\tprumer\tnejrychlejsi\t1.quartal\tmedian\t3.quartal\tnejpomalejsi\t<celkem [ms]>\t <gdm>" << endl;
+		cout << "#Vystup: <velikost N> <na GPU [ms]>\t<z GPU [ms]>\tprumer\tnejrychlejsi\t1.quartal\tmedian\t3.quartal\tnejpomalejsi\t<celkem [ms]>\t <poc_bloku> <poc_vlaken> <Sx> <Sy> <gdm>" << endl;
 		return 0;
 	}
 	for(int i=1;i<argc;i++)
@@ -326,6 +326,13 @@ int main(int argc, char** argv)
 	times.sort();
 	//<velikost N> <na GPU [ms]>\t<z GPU [ms]>\tprumer\tnejrychlejsi\t1.quartal\tmedian\t3.quartal\tnejpomalejsi\t<celkem [ms]>
 	cout << N << "\t?\t?\t" << prumer << "\t" << times.front() << "\t" << q1 << "\t" << q2 << "\t" << q3 << "\t" << times.back() << "\t" << sum << "\t";
+	int poc_vlaken = 0;
+	int poc_bloku = 0;
+	int poc_Sx = 0;
+	int poc_Sy = 0;
+	get_pocty(&poc_bloku, &poc_vlaken, &poc_Sx, &poc_Sy);
+	cout << poc_bloku << "\t" << poc_vlaken << "\t" << poc_Sx << "\t" << poc_Sy << "\t";
+
 	if(zpusob & ZPUSOB_GLOB_PRISTUP) cout << "G";
 	else cout << "g";
 	if(zpusob & ZPUSOB_CUDA_UPRAVA)  cout << "D";
