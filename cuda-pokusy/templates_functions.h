@@ -129,7 +129,7 @@ int save_vys(int N, TYPE* prava_strana, char* filename)
 		if(prava_strana!=NULL)
 		{
 			//file << "| " << prava_strana[y];
-			fprintf(f, "| %u", prava_strana[y]);
+			fprintf(f, " %u", prava_strana[y]);
 		}
 	}
 	//file.close();

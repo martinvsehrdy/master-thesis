@@ -34,6 +34,16 @@ unsigned int elem_uprava_s_delenim(unsigned int modul, unsigned int a_xy, unsign
 	}
 	return ((unsigned int)pom);
 }
+// elementarni uprava s delenim
+unsigned int elem_uprava_s_delenim1(unsigned int modul, unsigned int a_xy, unsigned int a_xp, unsigned int a_py)
+// \STATE $a_{xy} := a_{xy} - a_xp \cdot a_py$
+{
+	double p1 = ((double)a_xy) - (((double)a_xp) * ((double)a_py));
+	double q = floor(p1/(double)modul);
+	double p2 = q*modul;
+	
+	return ((unsigned int)(p1-p2));
+}
 // elementarni uprava bez deleni
 unsigned int elem_uprava_bez_deleni(unsigned int modul, unsigned int a_xy, unsigned int a_pp, unsigned int a_xp, unsigned int a_py)
 // \STATE $a_{xy} := a_{xy} \cdot a_pp - a_xp \cdot a_py$
@@ -137,7 +147,7 @@ void gauss_jordan_elim_for(int N, int modul, unsigned int* m_matice, unsigned in
 				unsigned int a_xp = m_matice[get_index(iX, ipivot, N)];
 				if( zpusob & ZPUSOB_S_DELENIM )
 				{
-					m_matice[get_index(iX, iY, N)]=elem_uprava_s_delenim(modul, a_xy, a_xp, a_py);
+					m_matice[get_index(iX, iY, N)]=elem_uprava_s_delenim1(modul, a_xy, a_xp, a_py);
 				}else
 				{
 					m_matice[get_index(iX, iY, N)]=elem_uprava_bez_deleni(modul, a_xy, a_pp, a_xp, a_py);

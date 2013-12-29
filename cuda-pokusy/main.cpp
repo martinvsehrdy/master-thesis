@@ -13,7 +13,7 @@
 
 using namespace std;
 
-#define POC_OPAKOVANI 1
+#define POC_OPAKOVANI 4
 //extern unsigned int measured_time;
 
 void statistic(list<float> l, float* quartal1, float* quartal2, float* quartal3, float* avg)
@@ -83,19 +83,40 @@ void main1(int argc, char** argv, int N, unsigned int settings)
 	unsigned int* P=new unsigned int[N];
 	unsigned int* Pfor=new unsigned int[N];
 
-	if(settings & ZPUSOB_HILBERT_MAT)
-	{
-		hilbert_matrix<unsigned int>(N, M, Pfor);
-	}else
-	{
-		tridiag_matrix<unsigned int>(N, M, Pfor);
-	}
-	gauss_jordan_elim_for(N, modul, M, Pfor, settings | ZPUSOB_S_DELENIM);
 	ss.str("");
 	ss.clear();
 	ss << "outmat-for";
-	//ss << N;
-	save_vys<unsigned int>(N, Pfor, (char*)ss.str().c_str());
+	ss << N;
+	fstream file;
+	file.open(ss.str().c_str(), fstream::in);
+	bool ok=false;
+	if(file.is_open())
+	{
+		int i;
+		file >> i;
+		if(i==N)
+		{
+			i=0;
+			while(!file.eof() && i<N)
+			{
+				file >> Pfor[i];
+				i++;
+			}
+			if(i==N) ok=true;
+		}
+	}
+	if(!ok)
+	{
+		if(settings & ZPUSOB_HILBERT_MAT)
+		{
+			hilbert_matrix<unsigned int>(N, M, Pfor);
+		}else
+		{
+			tridiag_matrix<unsigned int>(N, M, Pfor);
+		}
+		gauss_jordan_elim_for(N, modul, M, Pfor, settings | ZPUSOB_S_DELENIM);
+		save_vys<unsigned int>(N, Pfor, (char*)ss.str().c_str());
+	}
 
 	if(settings & ZPUSOB_HILBERT_MAT)
 	{
@@ -106,7 +127,12 @@ void main1(int argc, char** argv, int N, unsigned int settings)
 	}
 	vypsat_mat(N, N, M, P);
 	init_gpu_compute();
-	cuda_GJE_radky(N, modul, M, P, settings);
+	//cuda_GJE_radky(N, modul, M, P, settings);
+	unsigned int* S=new unsigned int[N*N+N];
+	copy_podmatice(N, 0, 0, N+1, N, S, M, P, COPY_MAT_B_GLOB_TO_A_SH);
+	cuda_GJE_global(N, modul, S, settings);
+	copy_podmatice(N, 0, 0, N+1, N, S, M, P, COPY_MAT_A_SH_TO_B_GLOB);
+	free(S);
 
 	ss.str("");
 	ss.clear();
@@ -213,12 +239,12 @@ int main(int argc, char** argv)
 {
 	
 	//main2(argc, argv);
-	/*main1(argc, argv, 20, (unsigned int)9 | ZPUSOB_GLOB_PRISTUP | ZPUSOB_CUDA_UPRAVA | ZPUSOB_HILBERT_MAT);
+	/*main1(argc, argv, 100, ZPUSOB_S_DELENIM | ZPUSOB_GLOB_PRISTUP | ZPUSOB_CUDA_UPRAVA | ZPUSOB_HILBERT_MAT);
 	
 	 /*/
 	////////////////////////////////////////////////////////
-	int N=10;
-	unsigned int modul=0x10000003; //(~(unsigned int)0);
+	int N=4;
+	unsigned int modul=0x7FFFFFED; //(~(unsigned int)0);
 	int zpusob=0;
 	if(argc>2)
 	{
@@ -258,6 +284,12 @@ int main(int argc, char** argv)
 				case 'm':
 				case 'M': zpusob |= ZPUSOB_HILBERT_MAT;
 					break;
+				case 'S':
+				case 's':
+					if('0'<=argv[i][j+1] && argv[i][j+1]<='9')
+					{
+						zpusob |= (atoi(&argv[i][j+1]))<<16;
+					}
 				}
 				j++;
 			}
@@ -339,6 +371,9 @@ int main(int argc, char** argv)
 	else cout << "d";
 	if(zpusob & ZPUSOB_HILBERT_MAT)  cout << "M";
 	else cout << "m";
+	int max_vys=0;
+	for(int i=0;i<N;i++) if(b[i]>max_vys) max_vys=b[i];
+	cout << "\t" << max_vys;
 	cout << endl;
 #else
 	cout << tt << "ms" << endl;
