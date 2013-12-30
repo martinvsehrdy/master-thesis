@@ -127,12 +127,12 @@ void main1(int argc, char** argv, int N, unsigned int settings)
 	}
 	vypsat_mat(N, N, M, P);
 	init_gpu_compute();
-	//cuda_GJE_radky(N, modul, M, P, settings);
-	unsigned int* S=new unsigned int[N*N+N];
+	cuda_GJE_radky(N, modul, M, P, settings);
+	/*unsigned int* S=new unsigned int[N*N+N];
 	copy_podmatice(N, 0, 0, N+1, N, S, M, P, COPY_MAT_B_GLOB_TO_A_SH);
 	cuda_GJE_global(N, modul, S, settings);
 	copy_podmatice(N, 0, 0, N+1, N, S, M, P, COPY_MAT_A_SH_TO_B_GLOB);
-	free(S);
+	free(S);//*/
 
 	ss.str("");
 	ss.clear();
@@ -239,7 +239,7 @@ int main(int argc, char** argv)
 {
 	
 	//main2(argc, argv);
-	/*main1(argc, argv, 100, ZPUSOB_S_DELENIM | ZPUSOB_GLOB_PRISTUP | ZPUSOB_CUDA_UPRAVA | ZPUSOB_HILBERT_MAT);
+	/*main1(argc, argv, 200, ZPUSOB_S_DELENIM | ZPUSOB_GLOB_PRISTUP | ZPUSOB_CUDA_UPRAVA | ZPUSOB_HILBERT_MAT);
 	
 	 /*/
 	////////////////////////////////////////////////////////
@@ -263,6 +263,7 @@ int main(int argc, char** argv)
 		cout << "#    G - vlakno zpracovava sloupec matice" << endl;
 		cout << "#    D - elementarni uprava bude v realnych cislech s CUDA funkcema" << endl;
 		cout << "#    M - hilbertova matice, jinak bude tridiagonalni" << endl;
+		cout << "#    S - Podmatice: pomer stran podmatice; Radkova: pocet bloku/SM (1)" << endl;
 		cout << "#Vystup: <velikost N> <na GPU [ms]>\t<z GPU [ms]>\tprumer\tnejrychlejsi\t1.quartal\tmedian\t3.quartal\tnejpomalejsi\t<celkem [ms]>\t <poc_bloku> <poc_vlaken> <Sx> <Sy> <gdm>" << endl;
 		return 0;
 	}

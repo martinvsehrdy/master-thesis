@@ -431,7 +431,6 @@ __device__ void cuda_compute_podmatice24(int N, unsigned int modul, int pivot_x,
 			is_podm3 = true;
 		}
 		// -------------------
-		unsigned int a_pp = actions2[isloupec];
 		__syncthreads();
 		int iY=tid;
 		while(iY<Sy)
@@ -517,7 +516,6 @@ __device__ void cuda_compute_podmatice13(int N, unsigned int modul, int pivot_x,
 		// -------------------
 		actions2[isloupec] = pom_mat[cuda_get_index(isloupec, isloupec, Sx)];
 		
-		unsigned int a_pp=1;
 		
 		__syncthreads();
 		int iY=tid;
@@ -760,79 +758,73 @@ void cuda_GJE_podmatice(int N, unsigned int modul, unsigned int* m_matice, unsig
 
 	cudaProfilerStop();
 }
-__global__ void find_inverse(int N, unsigned int modul, int posl_ipivot, unsigned int* m_matice, int* pivot_radek, unsigned int* inverse)
+__global__ void find_inverse(int N, unsigned int modul, int ipivot, unsigned int* m_matice, int* pivot_radek, unsigned int* inverse)
 {
-	int q=posl_ipivot;
-	int novy_ipivot=posl_ipivot;
-	novy_ipivot++;
+	int q=ipivot-1;
+	int novy_ipivot=ipivot;
 	unsigned int a;
-	do
+	if(threadIdx.x==0)
 	{
-		q++;
-		a = m_matice[cuda_get_index(novy_ipivot, q, N)];
-	}while( a==0 );
-	unsigned int a_inv = cuda_compute_inverse_eukleides(a, modul);
-	pivot_radek[0] = q;
-	inverse[0] = a_inv;
+		do
+		{
+			q++;
+			a = m_matice[cuda_get_index(novy_ipivot, q, N)];
+		}while( a==0 );
+		unsigned int a_inv = cuda_compute_inverse_eukleides(a, modul);
+		pivot_radek[0] = q;
+		inverse[0] = a_inv;
+	}
 }
 
-__global__ void cuda_GJE_radky_kernel(int N, unsigned int modul, unsigned int* m_matice, unsigned int* m_prava_strana, unsigned int zpusob)
+__global__ void cuda_GJE_radky_kernel_all(int N, unsigned int modul, unsigned int* m_matice, unsigned int* m_prava_strana, unsigned int zpusob)
 {
 	int tid=threadIdx.x;
 	int bdim=blockDim.x;
 	//int bid=blockIdx.x;
 	//int gdim=gridDim.x;
 
-	extern __shared__ unsigned int sh_mem[];	// size_sh_mem = N+1
 	__shared__ unsigned int sh_a_pq_inv;
 	int q;
 // \FOR{$p$ := $1$ do $N$}
 	// TODO: pouzit atomicInc kdyz budu pracovat s vice bloky
 	for(int ipivot=0;ipivot<N;ipivot++)
 	{
-	// \STATE \COMMENT{nalezeni radku s nenulovou hodnotou prvku $[p;q]$, kde $p<=q$}
-
 		__syncthreads();
 		q=ipivot;
-	// \STATE \COMMENT{priprava pivotniho radku}
-	// \STATE nacist prvek $[p;q]$ do sdilene pameti
 		// CUDA: shared, tid==0
 		if( tid==0 )
 		{
 			unsigned int a_pq = m_matice[cuda_get_index(ipivot, q, N)];
-			sh_mem[ipivot] = a_pq;
 			sh_a_pq_inv=cuda_compute_inverse_eukleides(a_pq, modul);
 		}
-	// \FOR{$x$ := $p+1$ do $N$}
 		__syncthreads();
-		int i=ipivot+tid;
 		unsigned int a_pq_inv=sh_a_pq_inv;
-		while(i<=N)	// CUDA: pres tid
+		int iX=ipivot+tid;
+		while(iX<=N)
 		{
 		// \STATE nacist, vydelit a ulozit do sdilene pameti
 			unsigned int a;
-			if(i==N) a = m_prava_strana[q];
-			else a = m_matice[cuda_get_index(i, q, N)];
-			a = cuda_multiply_add_modulo(modul, a, a_pq_inv, 0);
-			sh_mem[i] = a;
+			if(iX==N) a = m_prava_strana[q];
+			else a = m_matice[cuda_get_index(iX, q, N)];
+			a = cuda_multiply_add_modulo1(modul, a, a_pq_inv, 0);
 			// \STATE ulozit do globalni pameti prvek $[x;y]=[x;q]$
-			if(i==N) m_prava_strana[q] = sh_mem[i];
-			else 
-				m_matice[cuda_get_index(i, q, N)] = sh_mem[i];
-			i+=bdim;
+			if(iX==N) m_prava_strana[q] = a;
+			else m_matice[cuda_get_index(iX, q, N)] = a;
+			iX+=bdim;
 		}
 		//*/
 		__syncthreads();
 		//for(int iY=0;iY<N;iY++)
 		//int iX=tid+ipivot+1; while(iX<=N)
-		int iX=tid+ipivot+1;	// prochazi pres Y, kazde vlakno samostatny radek
+		iX=tid+ipivot+1;	// prochazi pres Y, kazde vlakno samostatny radek
 		while(iX<=N)
 		{
-			unsigned int a_xp = sh_mem[iX];
-		// \FOR{$x$ := $p+1$ do $N$}
+			unsigned int a_xp;
+			if(iX==N) a_xp = m_prava_strana[q];
+			else 
+				a_xp = m_matice[cuda_get_index(iX, q, N)];
 			for(int iY=0;iY<N;iY++)
 			{
-			// \IF{$y$ == $q$}
 				if(iY != q)	// ma na starosti pivotni radek => pouze uklada do globalni
 				{
 				// \STATE upravit prvek $[x;y]$ stejne jako pri nulovani prvku $[p;y]$
@@ -842,24 +834,78 @@ __global__ void cuda_GJE_radky_kernel(int N, unsigned int modul, unsigned int* m
 					else 
 						a_xy = m_matice[cuda_get_index(iX, iY, N)];
 					//cout << "  " << a_xy << " * " << a_pp << " - " << a_xp << " * " << a_py << endl;
-					a_xy = cuda_elem_uprava_s_delenim(modul, a_xy, a_xp, a_py);
+					a_xy = cuda_elem_uprava_s_delenim1(modul, a_xy, a_xp, a_py);
 						
 					if(iX==N) m_prava_strana[iY] = a_xy;
-					else 
-						m_matice[cuda_get_index(iX, iY, N)] = a_xy;
+					else m_matice[cuda_get_index(iX, iY, N)] = a_xy;
 				}
-			// \ENDIF
-		// \ENDFOR
+
 			}
 			iX+=bdim;
 		}
-	// \ENDFOR
-		__syncthreads();
 	}
-// \ENDFOR
 }
 
+__global__ void cuda_GJE_radky_kernel(int N, unsigned int modul, int ipivot, unsigned int* m_matice, unsigned int* m_prava_strana, 
+						int* pivot_radek, unsigned int* inverse, unsigned int zpusob)
+{
+	int tid=threadIdx.x;
+	int bdim=blockDim.x;
+	int bid=blockIdx.x;
 
+	int q=pivot_radek[0];
+	unsigned int a_pq_inv=inverse[0];
+	// \STATE \COMMENT{priprava pivotniho radku}
+// \FOR{$x$ := $p+1$ do $N$}
+	__syncthreads();
+	int iX=bid*bdim+tid+ipivot+1;	// prochazi pres Y, kazde vlakno samostatny radek
+	while(iX<=N && iX<(bid+1)*bdim+ipivot+1)
+	{
+	// \STATE nacist, vydelit a ulozit do sdilene pameti
+		unsigned int a;
+		if(iX==N) a = m_prava_strana[q];
+		else a = m_matice[cuda_get_index(iX, q, N)];
+		a = cuda_multiply_add_modulo1(modul, a, a_pq_inv, 0);
+		// \STATE ulozit do globalni pameti prvek $[x;y]=[x;q]$
+		if(iX==N) m_prava_strana[q] = a;
+		else 
+			m_matice[cuda_get_index(iX, q, N)] = a;
+		iX+=bdim;
+	}
+	//*/
+	__syncthreads();
+	//for(int iY=0;iY<N;iY++)
+	//int iX=tid+ipivot+1; while(iX<=N)
+	iX=bid*bdim+tid+ipivot+1;	// prochazi pres Y, kazde vlakno samostatny radek
+	while(iX<=N && iX<(bid+1)*bdim+ipivot+1)
+	{
+		unsigned int a_xp;
+		if(iX==N) a_xp = m_prava_strana[q];
+		else 
+			a_xp = m_matice[cuda_get_index(iX, q, N)];
+	// \FOR{$x$ := $p+1$ do $N$}
+		for(int iY=0;iY<N;iY++)
+		{
+		// \IF{$y$ == $q$}
+			if(iY != q)	// ma na starosti pivotni radek => pouze uklada do globalni
+			{
+			// \STATE upravit prvek $[x;y]$ stejne jako pri nulovani prvku $[p;y]$
+				unsigned int a_py = m_matice[cuda_get_index(ipivot, iY, N)];
+				unsigned int a_xy;
+				if(iX==N) a_xy = m_prava_strana[iY];
+				else 
+					a_xy = m_matice[cuda_get_index(iX, iY, N)];
+				//cout << "  " << a_xy << " * " << a_pp << " - " << a_xp << " * " << a_py << endl;
+				a_xy = cuda_elem_uprava_s_delenim(modul, a_xy, a_xp, a_py);
+						
+				if(iX==N) m_prava_strana[iY] = a_xy;
+				else 
+					m_matice[cuda_get_index(iX, iY, N)] = a_xy;
+			}
+		}
+		iX+=bdim;
+	}
+}
 	
 void cuda_GJE_radky(int N, unsigned int modul, unsigned int* m_matice, unsigned int* m_prava_strana, unsigned int zpusob)
 {
@@ -870,16 +916,57 @@ void cuda_GJE_radky(int N, unsigned int modul, unsigned int* m_matice, unsigned 
 	cudaMalloc((void**)&g_prava_strana, N*sizeof(unsigned int));
 	cudaMemcpy(g_matice, m_matice, (N*N)*sizeof(unsigned int), cudaMemcpyHostToDevice);
 	cudaMemcpy(g_prava_strana, m_prava_strana, N*sizeof(unsigned int), cudaMemcpyHostToDevice);
+	unsigned int* g_inverse;
+	cudaMalloc((void**)&g_inverse, sizeof(unsigned int));
+	int* g_pivot;
+	cudaMalloc((void**)&g_pivot, sizeof(int));
 	cuda_start_measuring();
+	int poc_SM = gpu_property.multiProcessorCount;
+	poc_SM*=(zpusob & ZPUSOB_POMER)>>16;
+	int num_of_blocks;
+	int num_of_threads;
 
-	// N+1 vlaken = N radku + 1 vl na pocitani inverze
-	int num_of_threads = min( gpu_property.warpSize*((int)ceil((float)(N+1)/gpu_property.warpSize)), gpu_property.maxThreadsPerBlock );
-	int size_of_shared=N+1;
-	//num_of_threads=32;
-	set_pocty(1, num_of_threads, size_of_shared, 0);
-	cuda_GJE_radky_kernel<<<1,num_of_threads, size_of_shared*sizeof(unsigned int)>>>(N, modul, g_matice, g_prava_strana, zpusob);
+	if( poc_SM==0 )
+	{
+		num_of_threads = min( gpu_property.warpSize*((int)ceil((float)(N+1)/gpu_property.warpSize)), gpu_property.maxThreadsPerBlock );
+		cuda_GJE_radky_kernel_all<<<1,num_of_threads>>>(N, modul, g_matice, g_prava_strana, zpusob);
+	}else
+	{
+#ifdef _DEBUG
+		FILE* file=fopen("log", "w");
+#endif
+		for(int ipivot=0;ipivot<N;ipivot++)
+		{
+			//printf("pivot = %d\n", ipivot);
+		// \STATE \COMMENT{nalezeni radku s nenulovou hodnotou prvku $[p;q]$, kde $p<=q$}
+			find_inverse<<<1,1>>>(N, modul, ipivot, g_matice, g_pivot, g_inverse);
+			if( (N+1-ipivot)<=poc_SM*gpu_property.maxThreadsPerBlock)
+			{
+				num_of_blocks = poc_SM;
+				num_of_threads = (int)ceil((float)(N+1-ipivot)/((float)num_of_blocks));
+			}else
+			{
+				num_of_threads = gpu_property.maxThreadsPerBlock;
+				num_of_blocks = (int)ceil((float)(N+1-ipivot)/((float)num_of_threads));
+			}
+			if(ipivot==0) set_pocty(num_of_blocks, num_of_threads, 0, 0);
+			cudaThreadSynchronize();
+		// \STATE \COMMENT{priprava pivotniho radku, Uprava ostatnich radku}
+			cuda_GJE_radky_kernel<<<num_of_blocks,num_of_threads>>>(N, modul, ipivot, g_matice, g_prava_strana, g_pivot, g_inverse, zpusob);
+			cudaThreadSynchronize();
+#ifdef _DEBUG
+			cudaMemcpy(m_matice, g_matice, (N*N)*sizeof(unsigned int), cudaMemcpyDeviceToHost);
+			cudaMemcpy(m_prava_strana, g_prava_strana, N*sizeof(unsigned int), cudaMemcpyDeviceToHost);
+			//vypsat_mat(N, N, m_matice, m_prava_strana);
+			fprintf(file, "pivot=%d\n", ipivot);
+			save_matrix(N, m_matice, m_prava_strana, file);
+		}
+		fclose(file);
+#else
+		}
+#endif
+	}
 	
-	cudaThreadSynchronize();
 	cuda_stop_measuring();
 	
 	cudaMemcpy(m_matice, g_matice, (N*N)*sizeof(unsigned int), cudaMemcpyDeviceToHost);
