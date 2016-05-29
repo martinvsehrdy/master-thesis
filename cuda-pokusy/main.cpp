@@ -13,7 +13,7 @@
 
 using namespace std;
 
-#define POC_OPAKOVANI 4
+#define POC_OPAKOVANI 1
 //extern unsigned int measured_time;
 
 void statistic(list<float> l, float* quartal1, float* quartal2, float* quartal3, float* avg)
@@ -239,7 +239,7 @@ int main(int argc, char** argv)
 {
 	
 	//main2(argc, argv);
-	/*main1(argc, argv, 200, ZPUSOB_S_DELENIM | ZPUSOB_GLOB_PRISTUP | ZPUSOB_CUDA_UPRAVA | ZPUSOB_HILBERT_MAT);
+	/*main1(argc, argv, 100, ZPUSOB_S_DELENIM | ZPUSOB_GLOB_PRISTUP | ZPUSOB_CUDA_UPRAVA | ZPUSOB_HILBERT_MAT);
 	
 	 /*/
 	////////////////////////////////////////////////////////
@@ -252,6 +252,8 @@ int main(int argc, char** argv)
 		zpusob=strtol(argv[2], NULL, 2);
 	}else
 	{
+		
+		print_gpus_info();
 		// TODO: (ne)vyuzivat sdilenou pamet; modulo v elementarni uprave;
 		cout << "#Program spustte ve tvaru:" << argv[0] << " <N> <zpusob zpracovani>" << endl;
 		cout << "#zpusob zpracovani: 0. bit \tfor/while(0) while/for(1)" << endl;
@@ -285,6 +287,9 @@ int main(int argc, char** argv)
 				case 'm':
 				case 'M': zpusob |= ZPUSOB_HILBERT_MAT;
 					break;
+				case 'a':
+				case 'A': zpusob |= ZPUSOB_ASTR;
+					break;
 				case 'S':
 				case 's':
 					if('0'<=argv[i][j+1] && argv[i][j+1]<='9')
@@ -314,6 +319,50 @@ int main(int argc, char** argv)
 		{
 			tridiag_matrix<unsigned int>(N, A, b);
 		}
+		if(zpusob & ZPUSOB_ASTR)
+		{
+			delete A;
+			delete b;
+			fstream fileA, fileb;
+			fileA.open("s000001.txt", fstream::in);
+			fileb.open("r000001.txt", fstream::in);
+			fileA >> N;
+			A=new unsigned int[N*N];
+			b=new unsigned int[N];
+			double* pom=new double[N+1];
+			double a;
+			double min=0;
+			for(int y=0;y<N;y++)
+			{
+				for(int x=0;x<N;x++)
+				{
+					if(!fileA.eof()) fileA >> a;
+					else a=0.0;
+					if( (min==0 || abs(a)<abs(min)) && a!=0) min=abs(a);
+					pom[x]=a;
+				}
+				if(!fileb.eof()) fileb >> a;
+				else a=0.0;
+				if( (min==0 || abs(a)<abs(min)) && a!=0) min=abs(a);
+				pom[N]=a;
+
+				for(int x=0;x<N;x++)
+				{
+					a = pom[x]/min;
+					a = fmod(a, (double)modul);
+					if( a>=0 ) A[get_index(x, y, N)]=(unsigned int)a;
+					else A[get_index(x, y, N)]=modul - (unsigned int)a;
+				}
+				a = pom[N]/min;
+				a = fmod(a, (double)modul);
+				if( a>=0 ) b[y]=(unsigned int)a;
+				else b[y]=modul - (unsigned int)a;
+				if(y%1000 == 0) cout << ".";
+			}
+			cout << endl;
+			delete pom;
+		}
+	
 #ifdef _DEBUG
 	vypsat_mat<unsigned int>(N, N, A, b);
 #endif

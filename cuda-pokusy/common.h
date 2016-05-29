@@ -17,6 +17,7 @@
 #define ZPUSOB_GLOB_PRISTUP	0x000100	// pristup vlaken z bloku do globalni pameti, vlakno zpracovava radek(0) nebo sloupec(1)
 #define ZPUSOB_CUDA_UPRAVA	0x000200	// deleni bude v integer(0) nebo pomoci CUDA fci(1)
 #define ZPUSOB_HILBERT_MAT	0x000400	// Hilbertova matice, jinak bude tridiagonalni
+#define ZPUSOB_ASTR         0x000800
 
 #define PODMATICE_12		0x008000	// 15.bit rezervovan na rozliseni podmatice12 a 34
 
